@@ -100,14 +100,26 @@ class ClassPairAmbiguityAttack:
         x_adv = x_adv + torch.empty_like(x_adv).uniform_(-self.epsilon, self.epsilon)
         x_adv = torch.clamp(x_adv, 0, 1)
 
+        # Verify initial state is valid - if not, fall back to clean images
+        with torch.no_grad():
+            init_logits = self.model(x_adv)
+            init_pred = init_logits.argmax(dim=1)
+            invalid_init = ~init_pred.eq(target_class)
+            if invalid_init.any():
+                # Revert invalid samples to clean images
+                x_adv[invalid_init] = x[invalid_init]
+
         # Select class pairs (based on clean prediction, not true label)
         if pair_indices is None:
             pair_indices = self._select_pairs(x, target_class)
 
-        # Track current step size (for backtracking)
-        alpha_current = self.alpha
+        # Track per-sample step sizes (for backtracking)
+        # Each sample can have different step size based on its backtracking history
+        batch_size = x.shape[0]
+        alpha_current = torch.ones(batch_size, device=x.device) * self.alpha
 
         # Track the best valid adversarial example (maintains correct predictions)
+        # At this point, all samples in x_adv are guaranteed to be correctly classified
         x_adv_best = x_adv.clone().detach()
 
         for step in range(self.num_steps):
@@ -148,30 +160,32 @@ class ClassPairAmbiguityAttack:
             # Gradient descent step
             grad = torch.autograd.grad(total_loss, x_adv)[0]
 
-            # Update adversarial example
+            # Update adversarial example with per-sample step sizes
             with torch.no_grad():
-                x_adv = x_adv - alpha_current * grad.sign()
+                # Reshape alpha for broadcasting: [batch_size] -> [batch_size, 1, 1, 1]
+                alpha_broadcast = alpha_current.view(batch_size, 1, 1, 1)
+                x_adv = x_adv - alpha_broadcast * grad.sign()
 
                 # Project to epsilon-ball
                 delta = torch.clamp(x_adv - x, -self.epsilon, self.epsilon)
                 x_adv = torch.clamp(x + delta, 0, 1)
 
             # CRITICAL CONSTRAINT: Check for misclassification from target class
-            # If any sample misclassified, step back and reduce step size (backtracking)
+            # Selective backtracking: Only revert misclassified samples
             with torch.no_grad():
                 logits_check = self.model(x_adv)
                 pred = logits_check.argmax(dim=1)
                 misclassified = ~pred.eq(target_class)
 
                 if misclassified.any():
-                    # Step back to previous state
-                    x_adv = x_adv_prev
-                    # Reduce step size by half
-                    alpha_current = alpha_current / 2.0
-                    # Continue to next iteration
-                    continue
+                    # Selective revert: Revert misclassified samples to last known valid state
+                    x_adv[misclassified] = x_adv_best[misclassified]
+                    # Reduce step size only for misclassified samples
+                    alpha_current[misclassified] /= 2.0
+                    # Update best ONLY for non-misclassified samples
+                    x_adv_best[~misclassified] = x_adv[~misclassified].clone().detach()
                 else:
-                    # Valid state - update best adversarial example
+                    # All samples valid - update all
                     x_adv_best = x_adv.clone().detach()
 
         # Return the last valid adversarial example that maintains correct predictions
