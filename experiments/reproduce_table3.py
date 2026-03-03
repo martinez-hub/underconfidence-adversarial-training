@@ -1,24 +1,26 @@
 """
-Reproduce Table 1 from the UAT paper.
+Reproduce Table 3 from the UAT paper.
 
-This script trains all 4 methods and evaluates them on multiple attacks
-to reproduce the main comparison table from the paper:
+This script trains all defense methods and evaluates them against multiple
+attacks to reproduce the defense comparison table from the paper.
 
-Methods:
+Defense Methods (rows):
 1. Vanilla (clean training)
 2. PGD-AT (PGD adversarial training, 10 steps)
 3. UAT-ConfSmooth (ConfSmooth adversarial training, 5 steps)
 4. UAT-ClassAmbiguity (Class-Pair Ambiguity adversarial training, 10 steps)
 
-Evaluation attacks:
+Evaluation Attacks (columns):
 - Clean (no attack)
-- PGD (L-inf, epsilon=8/255)
+- PGD (L-inf, epsilon=8/255, misclassification attack)
 - ConfSmooth (underconfidence attack)
 - ClassAmbiguity (underconfidence attack)
 
+Table 3: Defenses vs Attacks comparison with accuracy/robustness metrics
+
 Usage:
-    python experiments/reproduce_table1.py --epochs 200 --device cuda
-    python experiments/reproduce_table1.py --quick-test  # 1 epoch for testing
+    python experiments/reproduce_table3.py --epochs 200 --device cuda
+    python experiments/reproduce_table3.py --quick-test  # 1 epoch for testing
 """
 
 import argparse
@@ -238,9 +240,9 @@ def generate_table(all_results):
 
 
 def main(args):
-    """Main function to reproduce Table 1."""
+    """Main function to reproduce Table 3."""
     logger.info("="*60)
-    logger.info("REPRODUCING TABLE 1 FROM UAT PAPER")
+    logger.info("REPRODUCING TABLE 3 FROM UAT PAPER")
     logger.info("="*60)
 
     # Setup
@@ -310,14 +312,14 @@ def main(args):
 
     # Generate and print table
     logger.info("\n" + "="*60)
-    logger.info("TABLE 1: COMPARISON OF ALL METHODS")
+    logger.info("TABLE 3: DEFENSES VS ATTACKS COMPARISON")
     logger.info("="*60)
 
     df = generate_table(all_results)
     logger.info(f"\n{df.to_string(index=False)}\n")
 
     # Save to CSV
-    csv_path = Path(args.output_dir) / "table1_results.csv"
+    csv_path = Path(args.output_dir) / "table3_results.csv"
     df.to_csv(csv_path, index=False)
     logger.info(f"Results saved to: {csv_path}")
 
@@ -339,12 +341,12 @@ def main(args):
         logger.info(f"  ClassAmbiguity Rob. Acc: {amb_acc:.2f}%")
 
     logger.info("="*60)
-    logger.info("Table 1 reproduction complete!")
+    logger.info("Table 3 reproduction complete!")
     logger.info("="*60)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Reproduce Table 1 from UAT paper")
+    parser = argparse.ArgumentParser(description="Reproduce Table 3 from UAT paper")
     parser.add_argument(
         "--epochs",
         type=int,

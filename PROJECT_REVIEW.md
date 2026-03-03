@@ -124,26 +124,26 @@ experiments/
 ├── train.py                  # ✅ Exists - unified training script
 ├── eval.py                   # ✅ Exists - with calibration metrics
 ├── verify_attacks.py         # ✅ Exists - fixed verification
-├── reproduce_table1.py       # ✅ Exists - paper reproduction (Commit fb274a7)
-├── compare_methods.py        # ⏳ Optional - can use reproduce_table1.py
+├── reproduce_table3.py       # ✅ Exists - Table 3: Defenses vs Attacks (Commit fb274a7)
+├── compare_methods.py        # ⏳ Optional - can use reproduce_table3.py
 ├── plot_results.py           # ⏳ Optional - calibration.py has plotting
 └── benchmark.py              # ⏳ Optional - timing comparison
 ```
 
-**`reproduce_table1.py`** implemented:
-- ✅ Trains all 4 methods (vanilla, PGD-AT, UAT-ConfSmooth, UAT-Ambiguity)
-- ✅ Evaluates on multiple attack types (Clean, PGD, ConfSmooth, ClassAmbiguity)
+**`reproduce_table3.py`** implemented (Defenses vs Attacks comparison):
+- ✅ Trains all 4 defense methods (vanilla, PGD-AT, UAT-ConfSmooth, UAT-Ambiguity)
+- ✅ Evaluates on all attack types (Clean, PGD, ConfSmooth, ClassAmbiguity)
 - ✅ Computes calibration metrics (ECE, MCE, Brier) for all combinations
-- ✅ Generates formatted table saved as CSV
+- ✅ Generates formatted comparison table saved as CSV
 - ✅ Supports quick test mode and skip-training mode
 
 **Usage**:
 ```bash
 # Full reproduction (200 epochs)
-python experiments/reproduce_table1.py --epochs 200 --device cuda
+python experiments/reproduce_table3.py --epochs 200 --device cuda
 
 # Quick test (1 epoch)
-python experiments/reproduce_table1.py --quick-test
+python experiments/reproduce_table3.py --quick-test
 ```
 
 **Status**: ✅ Core experiments complete, optional tools can be added later
@@ -348,7 +348,7 @@ def validate_config(cfg: DictConfig) -> None:
 ### Phase 1: Critical Fixes ✅ COMPLETE
 1. ✅ **DONE** - Fix verification script checks (accuracy matching) - Commit 20cd422
 2. ✅ **DONE** - Add confidence calibration metrics (ECE, MCE, Brier) - Commit f908b2d
-3. ✅ **DONE** - Create `reproduce_table1.py` script - Commit fb274a7
+3. ✅ **DONE** - Create `reproduce_table3.py` script (defenses vs attacks) - Commit fb274a7
 
 ### Phase 2: Testing & Robustness (2-3 hours)
 4. Add comprehensive test suite
