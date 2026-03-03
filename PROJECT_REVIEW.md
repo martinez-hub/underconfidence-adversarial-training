@@ -243,25 +243,34 @@ src/models/
 
 ---
 
-### 9. **Confidence Calibration** - Add Metrics
+### 9. **Confidence Calibration** - ✅ COMPLETE
 
-**Current**: Only basic confidence stats
+**Implemented**: Comprehensive calibration metrics (Commit f908b2d)
 
-**Add**:
-- Expected Calibration Error (ECE)
-- Maximum Calibration Error (MCE)
-- Brier Score
-- Reliability diagrams
+**Added**:
+- ✅ Expected Calibration Error (ECE)
+- ✅ Maximum Calibration Error (MCE)
+- ✅ Brier Score
+- ✅ Reliability diagrams (plotting function)
+- ✅ Integration with eval.py
+- ✅ Comprehensive test suite (9 tests, all passing)
 
 ```python
-src/utils/calibration.py  # New file
-- compute_ece()
-- compute_mce()
-- compute_brier()
-- plot_reliability_diagram()
+src/utils/calibration.py  # ✅ Complete
+- compute_ece()           # ✅ Implemented
+- compute_mce()           # ✅ Implemented
+- compute_brier_score()   # ✅ Implemented
+- plot_reliability_diagram()  # ✅ Implemented
+- compute_calibration_metrics()  # ✅ All-in-one function
 ```
 
-**Priority**: High (important for underconfidence analysis)
+**Usage**:
+```bash
+python experiments/eval.py --checkpoint <path> --config <path>
+# Now reports ECE, MCE, Brier for clean and adversarial examples
+```
+
+**Status**: ✅ Complete
 
 ---
 
@@ -329,7 +338,7 @@ def validate_config(cfg: DictConfig) -> None:
 
 ### Phase 1: Critical Fixes (1-2 hours)
 1. ✅ **DONE** - Fix verification script checks (accuracy matching) - Commit 20cd422
-2. ⏳ Add confidence calibration metrics (ECE, MCE)
+2. ✅ **DONE** - Add confidence calibration metrics (ECE, MCE, Brier) - Commit f908b2d
 3. ⏳ Create `reproduce_table1.py` script
 
 ### Phase 2: Testing & Robustness (2-3 hours)
