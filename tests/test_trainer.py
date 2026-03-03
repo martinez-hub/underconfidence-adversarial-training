@@ -18,16 +18,24 @@ from src.training.trainer import Trainer
 @pytest.fixture
 def small_data_loaders():
     """Create small data loaders for quick testing."""
-    # Use tiny batch size and only 2 batches for speed
-    train_loader, val_loader = get_cifar10_loaders(
-        batch_size=16,
-        num_workers=0,
-        augment=False,
-    )
+    # Load full datasets first
+    from torchvision import datasets, transforms
 
-    # Limit to just 2 batches
-    train_loader.dataset = torch.utils.data.Subset(train_loader.dataset, range(32))
-    val_loader.dataset = torch.utils.data.Subset(val_loader.dataset, range(32))
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+    train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
+    val_dataset = datasets.CIFAR10(root='./data', train=False, transform=transform, download=True)
+
+    # Create subsets BEFORE creating DataLoaders
+    train_subset = torch.utils.data.Subset(train_dataset, range(32))
+    val_subset = torch.utils.data.Subset(val_dataset, range(32))
+
+    # Now create DataLoaders with the subsets
+    train_loader = torch.utils.data.DataLoader(train_subset, batch_size=16, shuffle=False, num_workers=0)
+    val_loader = torch.utils.data.DataLoader(val_subset, batch_size=16, shuffle=False, num_workers=0)
 
     return train_loader, val_loader
 
