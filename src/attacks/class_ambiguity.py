@@ -90,6 +90,8 @@ class ClassPairAmbiguityAttack:
             # Store previous state before taking step (for backtracking)
             x_adv_prev = x_adv.clone().detach()
 
+            # Create a leaf tensor for gradient computation
+            x_adv = x_adv.detach().clone()
             x_adv.requires_grad = True
 
             # Forward pass
@@ -122,6 +124,7 @@ class ClassPairAmbiguityAttack:
             # Gradient descent step
             grad = torch.autograd.grad(total_loss, x_adv)[0]
 
+            # Update adversarial example
             with torch.no_grad():
                 x_adv = x_adv - alpha_current * grad.sign()
 
@@ -138,7 +141,7 @@ class ClassPairAmbiguityAttack:
 
                 if misclassified.any():
                     # Step back to previous state
-                    x_adv = x_adv_prev.clone()
+                    x_adv = x_adv_prev
                     # Reduce step size by half
                     alpha_current = alpha_current / 2.0
                     # Continue to next iteration

@@ -64,6 +64,8 @@ class PGDAttack:
 
         # PGD attack loop
         for step in range(self.num_steps):
+            # Create a leaf tensor for gradient computation
+            x_adv = x_adv.detach().clone()
             x_adv.requires_grad = True
 
             # Forward pass

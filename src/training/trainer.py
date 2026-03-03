@@ -136,11 +136,10 @@ class Trainer:
                 x_train = x  # Vanilla: use clean images
             else:
                 # Adversarial training: generate adversarial examples
-                with torch.no_grad():
-                    # Switch to eval mode for attack generation
-                    self.model.eval()
-                    x_train = self.attack.generate(x, y)
-                    self.model.train()
+                # Switch to eval mode for attack generation
+                self.model.eval()
+                x_train = self.attack.generate(x, y)
+                self.model.train()
 
             # Train on generated examples with standard cross-entropy loss
             self.optimizer.zero_grad()
