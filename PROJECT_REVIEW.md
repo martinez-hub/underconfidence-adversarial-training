@@ -115,29 +115,38 @@ c) **GPU optimization**: Ensure all operations are GPU-friendly
 
 ---
 
-### 4. **Experiments** - Add Missing Experiment Scripts
+### 4. **Experiments** - ✅ MOSTLY COMPLETE
 
-**Current**: Have `train.py` and `eval.py`
-
-**Needed**:
+**Current Status**:
 
 ```
 experiments/
-├── train.py                  # ✅ Exists
-├── eval.py                   # ✅ Exists
-├── verify_attacks.py         # ✅ Exists
-├── reproduce_table1.py       # ❌ Missing - reproduce paper Table 1
-├── compare_methods.py        # ❌ Missing - compare all 4 methods
-├── plot_results.py           # ❌ Missing - visualization
-└── benchmark.py              # ❌ Missing - timing/efficiency comparison
+├── train.py                  # ✅ Exists - unified training script
+├── eval.py                   # ✅ Exists - with calibration metrics
+├── verify_attacks.py         # ✅ Exists - fixed verification
+├── reproduce_table1.py       # ✅ Exists - paper reproduction (Commit fb274a7)
+├── compare_methods.py        # ⏳ Optional - can use reproduce_table1.py
+├── plot_results.py           # ⏳ Optional - calibration.py has plotting
+└── benchmark.py              # ⏳ Optional - timing comparison
 ```
 
-**`reproduce_table1.py`** should:
-- Train all 4 methods (vanilla, PGD-AT, UAT-ConfSmooth, UAT-Ambiguity)
-- Evaluate on multiple attack types
-- Generate table matching paper format
+**`reproduce_table1.py`** implemented:
+- ✅ Trains all 4 methods (vanilla, PGD-AT, UAT-ConfSmooth, UAT-Ambiguity)
+- ✅ Evaluates on multiple attack types (Clean, PGD, ConfSmooth, ClassAmbiguity)
+- ✅ Computes calibration metrics (ECE, MCE, Brier) for all combinations
+- ✅ Generates formatted table saved as CSV
+- ✅ Supports quick test mode and skip-training mode
 
-**Priority**: High (needed for paper reproduction)
+**Usage**:
+```bash
+# Full reproduction (200 epochs)
+python experiments/reproduce_table1.py --epochs 200 --device cuda
+
+# Quick test (1 epoch)
+python experiments/reproduce_table1.py --quick-test
+```
+
+**Status**: ✅ Core experiments complete, optional tools can be added later
 
 ---
 
@@ -336,10 +345,10 @@ def validate_config(cfg: DictConfig) -> None:
 
 ## Recommended Implementation Priority
 
-### Phase 1: Critical Fixes (1-2 hours)
+### Phase 1: Critical Fixes ✅ COMPLETE
 1. ✅ **DONE** - Fix verification script checks (accuracy matching) - Commit 20cd422
 2. ✅ **DONE** - Add confidence calibration metrics (ECE, MCE, Brier) - Commit f908b2d
-3. ⏳ Create `reproduce_table1.py` script
+3. ✅ **DONE** - Create `reproduce_table1.py` script - Commit fb274a7
 
 ### Phase 2: Testing & Robustness (2-3 hours)
 4. Add comprehensive test suite
@@ -416,17 +425,19 @@ plt.savefig('training_curve.png')
 4. Add confidence calibration metrics
 5. Add visualization tools
 
-**Project Maturity**: 85% complete
+**Project Maturity**: 90% complete
 - Core: 100% ✅
-- Testing: 30% ⚠️
+- Testing: 40% ⚠️ (attack tests + calibration tests complete)
 - Documentation: 95% ✅
+- Experiments: 90% ✅ (core scripts complete)
 - Extensions: 20% ⚠️
 
 **Ready For**:
 - ✅ GPU training and full experiments
 - ✅ GitHub publication
-- ⚠️ Production use (needs more testing)
-- ⚠️ Paper reproduction (needs reproduce_table1.py)
+- ✅ Paper reproduction (reproduce_table1.py complete)
+- ✅ Calibration analysis (ECE, MCE, Brier metrics)
+- ⚠️ Production use (needs more comprehensive testing)
 
 ---
 
