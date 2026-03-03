@@ -1,0 +1,37 @@
+# Smoke test configuration - quick validation
+meta:
+  seed: 42
+  device: auto
+
+data:
+  batch_size: 64
+  num_workers: 2
+  augment: true
+  num_classes: 10  # CIFAR-10
+
+model:
+  architecture: resnet18
+
+training:
+  attack_type: "confsmooth"  # Options: vanilla, pgd, confsmooth, class_ambiguity
+
+attack:
+  epsilon: 0.031  # 8/255 (standard for CIFAR-10)
+  alpha: 0.008    # 2/255
+
+uat:
+  target_class_boost: 0.01  # ConfSmooth: target class gets 1% more probability
+  pair_mode: "top2"  # Class Ambiguity: random, top2, or fixed
+
+optim:
+  epochs: 2  # Quick test
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+  milestones: []
+  gamma: 0.1
+
+logging:
+  log_every: 10
+  save_every: 1
+  output_dir: "checkpoints/smoke_test"

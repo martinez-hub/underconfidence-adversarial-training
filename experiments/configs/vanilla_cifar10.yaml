@@ -1,0 +1,29 @@
+# Vanilla training configuration (baseline - no adversarial training)
+meta:
+  seed: 42
+  device: auto
+
+data:
+  batch_size: 128
+  num_workers: 4
+  augment: true
+  num_classes: 10
+
+model:
+  architecture: resnet18
+
+training:
+  attack_type: "vanilla"  # No adversarial training
+
+optim:
+  epochs: 200
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+  milestones: [100, 150]
+  gamma: 0.1
+
+logging:
+  log_every: 50
+  save_every: 10
+  output_dir: "checkpoints/vanilla_cifar10"

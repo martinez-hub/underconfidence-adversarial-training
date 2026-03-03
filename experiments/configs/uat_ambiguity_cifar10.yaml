@@ -1,0 +1,36 @@
+# UAT with Class-Pair Ambiguity configuration (novel method - 10 steps)
+meta:
+  seed: 42
+  device: auto
+
+data:
+  batch_size: 128
+  num_workers: 4
+  augment: true
+  num_classes: 10
+
+model:
+  architecture: resnet18
+
+training:
+  attack_type: "class_ambiguity"  # UAT with Class-Pair Ambiguity (10 steps)
+
+attack:
+  epsilon: 0.031  # 8/255
+  alpha: 0.008    # 2/255
+
+uat:
+  pair_mode: "top2"  # Options: random, top2, fixed
+
+optim:
+  epochs: 200
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+  milestones: [100, 150]
+  gamma: 0.1
+
+logging:
+  log_every: 50
+  save_every: 10
+  output_dir: "checkpoints/uat_ambiguity_cifar10"

@@ -1,0 +1,36 @@
+# UAT with ConfSmooth configuration (novel method - 5 steps)
+meta:
+  seed: 42
+  device: auto
+
+data:
+  batch_size: 128
+  num_workers: 4
+  augment: true
+  num_classes: 10
+
+model:
+  architecture: resnet18
+
+training:
+  attack_type: "confsmooth"  # UAT with ConfSmooth (5 steps - 50% fewer than PGD!)
+
+attack:
+  epsilon: 0.031  # 8/255
+  alpha: 0.008    # 2/255
+
+uat:
+  target_class_boost: 0.01  # Target class gets 1% more probability
+
+optim:
+  epochs: 200
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+  milestones: [100, 150]
+  gamma: 0.1
+
+logging:
+  log_every: 50
+  save_every: 10
+  output_dir: "checkpoints/uat_confsmooth_cifar10"
