@@ -44,7 +44,28 @@ class ConfSmoothAttack:
             num_steps: Number of attack iterations
             num_classes: Number of classes in the dataset
             target_class_boost: Additional probability mass for target class (default: 0.01)
+
+        Raises:
+            ValueError: If parameters are invalid
         """
+        if model is None:
+            raise ValueError("Model cannot be None")
+
+        if epsilon < 0:
+            raise ValueError(f"epsilon must be non-negative, got {epsilon}")
+
+        if alpha <= 0:
+            raise ValueError(f"alpha must be positive, got {alpha}")
+
+        if num_steps <= 0:
+            raise ValueError(f"num_steps must be positive, got {num_steps}")
+
+        if num_classes <= 1:
+            raise ValueError(f"num_classes must be > 1, got {num_classes}")
+
+        if not 0 <= target_class_boost <= 1:
+            raise ValueError(f"target_class_boost must be in [0, 1], got {target_class_boost}")
+
         self.model = model
         self.epsilon = epsilon
         self.alpha = alpha

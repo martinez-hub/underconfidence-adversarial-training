@@ -44,7 +44,28 @@ class ClassPairAmbiguityAttack:
                 - "random": Random pair per sample
                 - "top2": Top-2 predicted classes
                 - "fixed": Fixed pairs (e.g., (0,1), (2,3), ...)
+
+        Raises:
+            ValueError: If parameters are invalid
         """
+        if model is None:
+            raise ValueError("Model cannot be None")
+
+        if epsilon < 0:
+            raise ValueError(f"epsilon must be non-negative, got {epsilon}")
+
+        if alpha <= 0:
+            raise ValueError(f"alpha must be positive, got {alpha}")
+
+        if num_steps <= 0:
+            raise ValueError(f"num_steps must be positive, got {num_steps}")
+
+        valid_modes = ["random", "top2", "fixed"]
+        if target_pair_mode not in valid_modes:
+            raise ValueError(
+                f"target_pair_mode must be one of {valid_modes}, got {target_pair_mode}"
+            )
+
         self.model = model
         self.epsilon = epsilon
         self.alpha = alpha

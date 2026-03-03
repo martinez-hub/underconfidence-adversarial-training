@@ -33,7 +33,28 @@ class PGDAttack:
             alpha: Step size for each iteration
             num_steps: Number of attack iterations
             random_start: Whether to start from random point in epsilon-ball
+
+        Raises:
+            ValueError: If parameters are invalid
         """
+        if model is None:
+            raise ValueError("Model cannot be None")
+
+        if epsilon < 0:
+            raise ValueError(f"epsilon must be non-negative, got {epsilon}")
+
+        if epsilon > 1:
+            raise ValueError(f"epsilon should typically be <= 1, got {epsilon}")
+
+        if alpha <= 0:
+            raise ValueError(f"alpha must be positive, got {alpha}")
+
+        if alpha > epsilon:
+            raise ValueError(f"alpha ({alpha}) should typically be <= epsilon ({epsilon})")
+
+        if num_steps <= 0:
+            raise ValueError(f"num_steps must be positive, got {num_steps}")
+
         self.model = model
         self.epsilon = epsilon
         self.alpha = alpha
