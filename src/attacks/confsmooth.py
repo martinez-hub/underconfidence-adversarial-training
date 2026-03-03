@@ -97,6 +97,9 @@ class ConfSmoothAttack:
         # Track current step size (for backtracking)
         alpha_current = self.alpha
 
+        # Track the best valid adversarial example (maintains correct predictions)
+        x_adv_best = x_adv.clone().detach()
+
         for step in range(self.num_steps):
             # Store previous state before taking step (for backtracking)
             x_adv_prev = x_adv.clone().detach()
@@ -139,5 +142,9 @@ class ConfSmoothAttack:
                     alpha_current = alpha_current / 2.0
                     # Continue to next iteration
                     continue
+                else:
+                    # Valid state - update best adversarial example
+                    x_adv_best = x_adv.clone().detach()
 
-        return x_adv.detach()
+        # Return the last valid adversarial example that maintains correct predictions
+        return x_adv_best.detach()
