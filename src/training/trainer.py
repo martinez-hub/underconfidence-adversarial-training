@@ -120,6 +120,10 @@ class Trainer:
             "learning_rate": [],
         }
 
+        # Best model tracking
+        self.best_val_acc = 0.0
+        self.best_epoch = 0
+
     def train_epoch(self, epoch: int) -> Dict[str, float]:
         """
         Single epoch of training.
@@ -256,7 +260,24 @@ class Trainer:
                 f"LR: {current_lr:.6f}"
             )
 
-            # Checkpoint saving (with training history)
+            # Save best model (based on validation accuracy)
+            if val_metrics["val_acc"] > self.best_val_acc:
+                self.best_val_acc = val_metrics["val_acc"]
+                self.best_epoch = epoch
+
+                best_model_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_best_model.pt"
+                save_checkpoint(
+                    self.model,
+                    self.optimizer,
+                    epoch,
+                    path=best_model_path,
+                    history=self.history,
+                    config=self.cfg,
+                    best_val_acc=self.best_val_acc,
+                )
+                logger.info(f"🏆 New best model! Val Acc: {self.best_val_acc:.2f}% (saved to {best_model_path})")
+
+            # Periodic checkpoint saving (with training history)
             if epoch % self.cfg.logging.save_every == 0:
                 checkpoint_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_epoch{epoch}.pt"
                 save_checkpoint(
@@ -269,4 +290,16 @@ class Trainer:
                 )
                 logger.info(f"Saved checkpoint: {checkpoint_path}")
 
-        logger.info("Training complete!")
+        # Save final model
+        final_model_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_final_model.pt"
+        save_checkpoint(
+            self.model,
+            self.optimizer,
+            self.cfg.optim.epochs,
+            path=final_model_path,
+            history=self.history,
+            config=self.cfg,
+        )
+        logger.info(f"Saved final model: {final_model_path}")
+
+        logger.info(f"Training complete! Best Val Acc: {self.best_val_acc:.2f}% (Epoch {self.best_epoch})")
