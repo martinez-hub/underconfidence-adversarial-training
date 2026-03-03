@@ -110,6 +110,16 @@ class Trainer:
         else:
             raise ValueError(f"Unknown attack type: {self.attack_type}")
 
+        # Training history tracking
+        self.history = {
+            "train_loss": [],
+            "train_acc_clean": [],
+            "train_acc_train": [],
+            "val_loss": [],
+            "val_acc": [],
+            "learning_rate": [],
+        }
+
     def train_epoch(self, epoch: int) -> Dict[str, float]:
         """
         Single epoch of training.
@@ -221,6 +231,17 @@ class Trainer:
             # Validation
             val_metrics = self.validate(epoch)
 
+            # Get current learning rate
+            current_lr = self.optimizer.param_groups[0]['lr']
+
+            # Update training history
+            self.history["train_loss"].append(train_metrics["train_loss"])
+            self.history["train_acc_clean"].append(train_metrics["train_acc_clean"])
+            self.history["train_acc_train"].append(train_metrics["train_acc_train"])
+            self.history["val_loss"].append(val_metrics["val_loss"])
+            self.history["val_acc"].append(val_metrics["val_acc"])
+            self.history["learning_rate"].append(current_lr)
+
             # Update learning rate
             self.scheduler.step()
 
@@ -231,10 +252,11 @@ class Trainer:
                 f"Train Loss: {train_metrics['train_loss']:.4f} | "
                 f"Train Acc (clean): {train_metrics['train_acc_clean']:.2f}% | "
                 f"Train Acc (train): {train_metrics['train_acc_train']:.2f}% | "
-                f"Val Acc: {val_metrics['val_acc']:.2f}%"
+                f"Val Acc: {val_metrics['val_acc']:.2f}% | "
+                f"LR: {current_lr:.6f}"
             )
 
-            # Checkpoint saving
+            # Checkpoint saving (with training history)
             if epoch % self.cfg.logging.save_every == 0:
                 checkpoint_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_epoch{epoch}.pt"
                 save_checkpoint(
@@ -242,6 +264,8 @@ class Trainer:
                     self.optimizer,
                     epoch,
                     path=checkpoint_path,
+                    history=self.history,
+                    config=self.cfg,
                 )
                 logger.info(f"Saved checkpoint: {checkpoint_path}")
 
