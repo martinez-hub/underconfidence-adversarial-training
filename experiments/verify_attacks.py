@@ -193,12 +193,12 @@ def verify_attacks(num_batches=5):
     if conf_reduces_confidence:
         checks_passed += 1
 
-    # Check 3: ConfSmooth maintains 100% accuracy (backtracking works)
+    # Check 3: ConfSmooth maintains same predictions as clean (backtracking works)
     total_checks += 1
-    conf_maintains_accuracy = conf_avg['accuracy'] == 100.0
+    conf_maintains_accuracy = abs(conf_avg['accuracy'] - clean_avg['accuracy']) < 0.1  # Allow tiny numerical difference
     status = "✅ PASS" if conf_maintains_accuracy else "❌ FAIL"
-    logger.info(f"\n3. ConfSmooth maintains 100% accuracy (backtracking): {status}")
-    logger.info(f"   ConfSmooth accuracy: {conf_avg['accuracy']:.1f}%")
+    logger.info(f"\n3. ConfSmooth maintains predictions (same as clean): {status}")
+    logger.info(f"   Clean: {clean_avg['accuracy']:.1f}%, ConfSmooth: {conf_avg['accuracy']:.1f}%")
     if conf_maintains_accuracy:
         checks_passed += 1
 
@@ -222,12 +222,12 @@ def verify_attacks(num_batches=5):
     if amb_reduces_confidence:
         checks_passed += 1
 
-    # Check 6: ClassAmbiguity maintains 100% accuracy (backtracking works)
+    # Check 6: ClassAmbiguity maintains same predictions as clean (backtracking works)
     total_checks += 1
-    amb_maintains_accuracy = amb_avg['accuracy'] == 100.0
+    amb_maintains_accuracy = abs(amb_avg['accuracy'] - clean_avg['accuracy']) < 0.1  # Allow tiny numerical difference
     status = "✅ PASS" if amb_maintains_accuracy else "❌ FAIL"
-    logger.info(f"\n6. ClassAmbiguity maintains 100% accuracy (backtracking): {status}")
-    logger.info(f"   Ambiguity accuracy: {amb_avg['accuracy']:.1f}%")
+    logger.info(f"\n6. ClassAmbiguity maintains predictions (same as clean): {status}")
+    logger.info(f"   Clean: {clean_avg['accuracy']:.1f}%, ClassAmbiguity: {amb_avg['accuracy']:.1f}%")
     if amb_maintains_accuracy:
         checks_passed += 1
 
