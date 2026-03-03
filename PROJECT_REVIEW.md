@@ -350,10 +350,10 @@ def validate_config(cfg: DictConfig) -> None:
 2. ✅ **DONE** - Add confidence calibration metrics (ECE, MCE, Brier) - Commit f908b2d
 3. ✅ **DONE** - Create `reproduce_table3.py` script (defenses vs attacks) - Commit fb274a7
 
-### Phase 2: Testing & Robustness (2-3 hours)
-4. Add comprehensive test suite
-5. Add error handling and validation
-6. Fix batch-wise backtracking for performance
+### Phase 2: Testing & Robustness (2-3 hours) ✅ IN PROGRESS
+4. ✅ **DONE** - Add comprehensive test suite (Commit 7273a4c) - 33 tests
+5. ✅ **DONE** - Add error handling and validation (Commit 7b723be) - 32 tests
+6. ⏳ Fix batch-wise backtracking for performance
 
 ### Phase 3: Analysis Tools (2-3 hours)
 7. Add plotting/visualization tools
