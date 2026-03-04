@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  uat:
+    build: .
+    image: uat:latest
+    container_name: uat-container
+    volumes:
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+      - ./plots:/workspace/plots
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  # GPU-enabled version (requires nvidia-docker)
+  uat-gpu:
+    build: .
+    image: uat:latest
+    container_name: uat-gpu-container
+    volumes:
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+      - ./plots:/workspace/plots
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

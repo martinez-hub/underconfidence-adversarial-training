@@ -21,13 +21,29 @@ This repository implements Underconfidence Adversarial Training (UAT), a novel d
 
 ## Installation
 
+### Option 1: Local Installation
+
 ```bash
 git clone https://github.com/martinez-hub/underconfidence-adversarial-training.git
 cd underconfidence-adversarial-training
 pip install -r requirements.txt
 ```
 
-**Requirements:** Python 3.8+, PyTorch 2.0+
+**Requirements:** Python 3.11+, PyTorch 2.6+
+
+### Option 2: Docker (Recommended)
+
+```bash
+# Build and run with Docker
+docker build -t uat:latest .
+docker run -it --rm -v $(pwd)/data:/workspace/data -v $(pwd)/checkpoints:/workspace/checkpoints uat:latest
+
+# Or use docker-compose
+docker-compose run uat
+
+# For GPU support (requires nvidia-docker)
+docker-compose run uat-gpu
+```
 
 ---
 

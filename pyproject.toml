@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "underconfidence-adversarial-training"
+version = "1.0.0"
+description = "Official implementation of UAT: Improving Vision Model Robustness via Underconfidence Adversarial Training (NLDL 2026)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Josué Martínez-Martínez", email = "josuemartinezphd@gmail.com"}
+]
+keywords = ["adversarial training", "deep learning", "robustness", "computer vision"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "numpy>=1.26.0",
+    "omegaconf>=2.3.0",
+    "tqdm>=4.66.0",
+    "matplotlib>=3.9.0",
+    "pandas>=2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/martinez-hub/underconfidence-adversarial-training"
+Repository = "https://github.com/martinez-hub/underconfidence-adversarial-training"
+Paper = "https://proceedings.mlr.press/v307/marti-nez-marti-nez26a.html"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
