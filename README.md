@@ -183,22 +183,3 @@ If you use this code in your research, please cite:
 }
 ```
 
----
-
-## License
-
-MIT License - see LICENSE file for details
-
----
-
-## Contact
-
-**Josué Martínez-Martínez**
-- Email: josuemartinezphd@gmail.com
-- GitHub: https://github.com/martinez-hub/underconfidence-adversarial-training
-
----
-
-## Acknowledgments
-
-This research was conducted at Lawrence Livermore National Laboratory and University of Connecticut.
