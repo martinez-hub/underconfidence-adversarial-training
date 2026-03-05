@@ -2,24 +2,68 @@
 """Quick script to verify installation is working correctly."""
 
 import sys
+import os
+from pathlib import Path
 
 print("=" * 60)
 print("Verifying UAT Installation")
 print("=" * 60)
 
+# Test 0: Check current directory and Python path
+print("\n[0/5] Checking environment...")
+print(f"   Current directory: {Path.cwd()}")
+print(f"   Python version: {sys.version.split()[0]}")
+print(f"   Python path entries: {len(sys.path)}")
+
+# Check if we're in the project root
+expected_dirs = ["src", "experiments", "tests"]
+missing_dirs = [d for d in expected_dirs if not Path(d).exists()]
+if missing_dirs:
+    print(f"⚠️  Warning: Not in project root? Missing: {missing_dirs}")
+    print("   Please cd to the underconfidence-adversarial-training directory")
+else:
+    print(f"✅ In project root directory")
+
 # Test 1: Import src modules
 print("\n[1/5] Testing src module imports...")
 try:
     import src
+    print(f"   ✓ src package found at: {src.__file__ if hasattr(src, '__file__') else 'built-in'}")
+
     from src.data.cifar10 import get_cifar10_loaders
+    print(f"   ✓ src.data.cifar10 imported")
+
     from src.models.resnet import get_resnet18_cifar10
+    print(f"   ✓ src.models.resnet imported")
+
     from src.training.trainer import Trainer
+    print(f"   ✓ src.training.trainer imported")
+
     from src.attacks.pgd import PGDAttack
+    print(f"   ✓ src.attacks.pgd imported")
+
     from src.utils.config import load_config
+    print(f"   ✓ src.utils.config imported")
+
     print("✅ All src modules imported successfully!")
 except ImportError as e:
     print(f"❌ Import error: {e}")
-    print("\nPlease run: pip install -e .")
+    print("\nDiagnostic information:")
+    print(f"   Python path: {sys.path[:3]}...")
+    print(f"   Working directory: {os.getcwd()}")
+
+    # Try to find where src is
+    import importlib.util
+    spec = importlib.util.find_spec("src")
+    if spec is None:
+        print(f"   'src' package not found in Python path")
+        print("\n💡 Solution:")
+        print("   1. Make sure you ran: pip install -e .")
+        print("   2. Try reinstalling: pip uninstall underconfidence-adversarial-training && pip install -e .")
+        print("   3. Check if you're in a virtual environment")
+    else:
+        print(f"   'src' found at: {spec.origin}")
+        print(f"   But import failed with: {e}")
     sys.exit(1)
 
 # Test 2: Check PyTorch

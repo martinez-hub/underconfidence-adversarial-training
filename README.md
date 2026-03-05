@@ -21,18 +21,29 @@ This repository implements Underconfidence Adversarial Training (UAT), a novel d
 
 ## Installation
 
-### Option 1: Local Installation
+### Option 1: Automatic Installation (Recommended)
 
 ```bash
 # Clone repository
 git clone https://github.com/martinez-hub/underconfidence-adversarial-training.git
 cd underconfidence-adversarial-training
 
-# Install package in editable mode (recommended for development)
-pip install -e .
+# Run installation script (does everything automatically)
+bash install.sh
+```
 
-# Or install with development tools
-pip install -e ".[dev]"
+### Option 2: Manual Installation
+
+```bash
+# Clone repository
+git clone https://github.com/martinez-hub/underconfidence-adversarial-training.git
+cd underconfidence-adversarial-training
+
+# IMPORTANT: Make sure you're in the project root directory
+pwd  # Should end with: /underconfidence-adversarial-training
+
+# Install package in editable mode
+pip install -e .
 
 # Verify installation
 python verify_install.py
@@ -40,7 +51,11 @@ python verify_install.py
 
 **Requirements:** Python 3.11+, PyTorch 2.6+
 
-**Note:** The `-e` flag installs the package in editable mode, which allows you to modify the source code without reinstalling. This also properly configures the `src` module for imports. Run `verify_install.py` to confirm everything is working.
+**Important Notes:**
+- ⚠️ **You must run `pip install -e .` from the project root directory** (where `pyproject.toml` is located)
+- The `-e` flag installs in editable mode and properly configures the `src` module
+- Run `python verify_install.py` to confirm everything works
+- If imports fail, make sure you're in the correct directory and try: `pip uninstall underconfidence-adversarial-training && pip install -e .`
 
 ### Option 2: Docker (Recommended)
 
