@@ -44,9 +44,9 @@ Homepage = "https://github.com/martinez-hub/underconfidence-adversarial-training
 Repository = "https://github.com/martinez-hub/underconfidence-adversarial-training"
 Paper = "https://proceedings.mlr.press/v307/marti-nez-marti-nez26a.html"
 
-[tool.setuptools]
-packages = ["src", "src.attacks", "src.data", "src.models", "src.training", "src.utils"]
-package-dir = {"" = "."}
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 
 [tool.setuptools.package-data]
 src = ["py.typed"]
