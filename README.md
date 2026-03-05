@@ -33,11 +33,14 @@ pip install -e .
 
 # Or install with development tools
 pip install -e ".[dev]"
+
+# Verify installation
+python verify_install.py
 ```
 
 **Requirements:** Python 3.11+, PyTorch 2.6+
 
-**Note:** The `-e` flag installs the package in editable mode, which allows you to modify the source code without reinstalling. This also properly configures the `src` module for imports.
+**Note:** The `-e` flag installs the package in editable mode, which allows you to modify the source code without reinstalling. This also properly configures the `src` module for imports. Run `verify_install.py` to confirm everything is working.
 
 ### Option 2: Docker (Recommended)
 
