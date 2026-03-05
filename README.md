@@ -24,12 +24,20 @@ This repository implements Underconfidence Adversarial Training (UAT), a novel d
 ### Option 1: Local Installation
 
 ```bash
+# Clone repository
 git clone https://github.com/martinez-hub/underconfidence-adversarial-training.git
 cd underconfidence-adversarial-training
-pip install -r requirements.txt
+
+# Install package in editable mode (recommended for development)
+pip install -e .
+
+# Or install with development tools
+pip install -e ".[dev]"
 ```
 
 **Requirements:** Python 3.11+, PyTorch 2.6+
+
+**Note:** The `-e` flag installs the package in editable mode, which allows you to modify the source code without reinstalling. This also properly configures the `src` module for imports.
 
 ### Option 2: Docker (Recommended)
 
@@ -180,6 +188,31 @@ pytest tests/test_attacks.py -v
 
 # Run comprehensive smoke test
 python tests/smoke_test_comprehensive.py
+```
+
+---
+
+## Troubleshooting
+
+### ModuleNotFoundError: No module named 'src'
+
+If you encounter import errors like `ModuleNotFoundError: No module named 'src.data'`, make sure you installed the package properly:
+
+```bash
+# Reinstall in editable mode
+pip install -e .
+```
+
+This ensures that the `src` module is properly added to your Python path.
+
+### Alternative: Manual PYTHONPATH
+
+If you prefer not to install the package, you can run scripts with:
+
+```bash
+# Set PYTHONPATH to include project root
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+python experiments/train.py --config experiments/configs/smoke_test.yaml
 ```
 
 ---
