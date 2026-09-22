@@ -192,15 +192,15 @@ def test_backtracking_is_per_sample_not_whole_batch():
     model = get_resnet18_cifar10()
     model.eval()
 
-    batch_size = 32
+    batch_size = 16
     x = torch.rand(batch_size, 3, 32, 32)
     y = torch.randint(0, 10, (batch_size,))
 
     # epsilon == alpha with this seed lands in the regime where only some
-    # samples backtrack (11 of 32), which is exactly what distinguishes
-    # per-sample from whole-batch behaviour. At 8/255 none backtrack; much
-    # above 0.05 they all do.
-    attack = ConfSmoothAttack(model, epsilon=0.04, alpha=0.04, num_steps=30, num_classes=10)
+    # samples backtrack (13 of 16, ending on 3 distinct step sizes), which is
+    # what distinguishes per-sample from whole-batch behaviour. At 8/255 none
+    # backtrack; well above 0.05 they all do, collapsing the signal.
+    attack = ConfSmoothAttack(model, epsilon=0.05, alpha=0.05, num_steps=12, num_classes=10)
     x_adv, info = attack.generate(x, y, return_info=True)
 
     alpha_final = info["alpha_final"]
@@ -243,15 +243,18 @@ def test_class_ambiguity_also_reports_per_sample_backtracking():
     model = get_resnet18_cifar10()
     model.eval()
 
-    x = torch.rand(32, 3, 32, 32)
-    y = torch.randint(0, 10, (32,))
+    # This test only checks that the diagnostics are shaped per sample and the
+    # invariant holds, so it does not need the discriminating regime above -
+    # keep it small.
+    x = torch.rand(16, 3, 32, 32)
+    y = torch.randint(0, 10, (16,))
 
     attack = ClassPairAmbiguityAttack(
-        model, epsilon=0.04, alpha=0.04, num_steps=30, target_pair_mode="top2"
+        model, epsilon=0.05, alpha=0.05, num_steps=12, target_pair_mode="top2"
     )
     x_adv, info = attack.generate(x, y, return_info=True)
 
-    assert info["alpha_final"].shape == (32,)
+    assert info["alpha_final"].shape == (16,)
     with torch.no_grad():
         assert (model(x_adv).argmax(1) == model(x).argmax(1)).all()
 

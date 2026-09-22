@@ -39,6 +39,9 @@ dev = [
     "isort>=5.13.0",
     "codespell>=2.3",
     "pre-commit>=3.7.0",
+    # CI runs the suite with `-n auto`: the attack tests dominate runtime and
+    # are independent, so a single-process run leaves runner cores idle.
+    "pytest-xdist>=3.0",
 ]
 
 [project.urls]
