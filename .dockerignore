@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Data and checkpoints (too large)
+data/
+checkpoints/
+*.pt
+*.pth
+
+# Plots and outputs
+plots/
+*.png
+*.pdf
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.DS_Store
+*.log
+
+# Secrets
+.env
+*.env

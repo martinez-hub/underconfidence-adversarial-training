@@ -71,9 +71,9 @@ def train_model(
     Returns:
         Path to saved checkpoint
     """
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info(f"Training: {method_name}")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Initialize model
     model = get_resnet18_cifar10()
@@ -97,18 +97,21 @@ def train_model(
     # Create trainer
     # Build a minimal config dict for trainer
     from omegaconf import OmegaConf
-    cfg = OmegaConf.create({
-        'training': {'attack_type': attack_type},
-        'attack': {'epsilon': 8/255, 'alpha': 2/255},
-        'uat': {'target_class_boost': 0.01, 'pair_mode': 'top2'},
-        'data': {'num_classes': 10},
-        'optim': {'epochs': epochs, 'milestones': [100, 150], 'gamma': 0.1},
-        'logging': {
-            'log_every': 50,
-            'save_every': 50,
-            'output_dir': f"{output_dir}/{method_name}",
-        },
-    })
+
+    cfg = OmegaConf.create(
+        {
+            "training": {"attack_type": attack_type},
+            "attack": {"epsilon": 8 / 255, "alpha": 2 / 255},
+            "uat": {"target_class_boost": 0.01, "pair_mode": "top2"},
+            "data": {"num_classes": 10},
+            "optim": {"epochs": epochs, "milestones": [100, 150], "gamma": 0.1},
+            "logging": {
+                "log_every": 50,
+                "save_every": 50,
+                "output_dir": f"{output_dir}/{method_name}",
+            },
+        }
+    )
 
     trainer = Trainer(
         model=model,
@@ -133,7 +136,7 @@ def train_model(
     return checkpoint_path
 
 
-def evaluate_model_all_attacks(model, test_loader, device, epsilon=8/255, alpha=2/255):
+def evaluate_model_all_attacks(model, test_loader, device, epsilon=8 / 255, alpha=2 / 255):
     """
     Evaluate a model on clean and all adversarial attacks.
 
@@ -154,18 +157,21 @@ def evaluate_model_all_attacks(model, test_loader, device, epsilon=8/255, alpha=
 
     # Initialize attacks
     pgd = PGDAttack(model, epsilon=epsilon, alpha=alpha, num_steps=20)
-    confsmooth = ConfSmoothAttack(
-        model, epsilon=epsilon, alpha=alpha, num_steps=20, num_classes=10
-    )
+    confsmooth = ConfSmoothAttack(model, epsilon=epsilon, alpha=alpha, num_steps=20, num_classes=10)
     ambiguity = ClassPairAmbiguityAttack(
-        model, epsilon=epsilon, alpha=alpha, num_steps=20, target_pair_mode="top2"
+        model,
+        epsilon=epsilon,
+        alpha=alpha,
+        num_steps=20,
+        target_pair_mode="top2",
+        num_classes=10,
     )
 
     attacks = {
-        'Clean': None,
-        'PGD': pgd,
-        'ConfSmooth': confsmooth,
-        'ClassAmbiguity': ambiguity,
+        "Clean": None,
+        "PGD": pgd,
+        "ConfSmooth": confsmooth,
+        "ClassAmbiguity": ambiguity,
     }
 
     results = {}
@@ -178,15 +184,17 @@ def evaluate_model_all_attacks(model, test_loader, device, epsilon=8/255, alpha=
         all_probs = []
         all_labels = []
 
-        with torch.no_grad():
-            for x, y in tqdm(test_loader, desc=attack_name):
-                x, y = x.to(device), y.to(device)
+        for x, y in tqdm(test_loader, desc=attack_name):
+            x, y = x.to(device), y.to(device)
 
-                # Generate adversarial examples (or use clean)
-                if attack is not None:
-                    x = attack.generate(x, y)
+            # Generate adversarial examples (or use clean). This must stay
+            # OUTSIDE torch.no_grad(): the attacks build their own graph and
+            # call torch.autograd.grad internally.
+            if attack is not None:
+                x = attack.generate(x, y)
 
-                # Evaluate
+            # Evaluate
+            with torch.no_grad():
                 logits = model(x)
                 probs = F.softmax(logits, dim=1)
                 pred = logits.argmax(1)
@@ -203,14 +211,16 @@ def evaluate_model_all_attacks(model, test_loader, device, epsilon=8/255, alpha=
         calib = compute_calibration_metrics(all_probs, all_labels, n_bins=15)
 
         results[attack_name] = {
-            'accuracy': 100.0 * correct / total,
-            'ece': calib['ece'],
-            'mce': calib['mce'],
-            'brier': calib['brier'],
+            "accuracy": 100.0 * correct / total,
+            "ece": calib["ece"],
+            "mce": calib["mce"],
+            "brier": calib["brier"],
         }
 
-        logger.info(f"{attack_name}: Acc={results[attack_name]['accuracy']:.2f}%, "
-                   f"ECE={results[attack_name]['ece']:.4f}")
+        logger.info(
+            f"{attack_name}: Acc={results[attack_name]['accuracy']:.2f}%, "
+            f"ECE={results[attack_name]['ece']:.4f}"
+        )
 
     return results
 
@@ -228,7 +238,7 @@ def generate_table(all_results):
     # Extract data for table
     rows = []
     for method_name, results in all_results.items():
-        row = {'Method': method_name}
+        row = {"Method": method_name}
         for attack_name, metrics in results.items():
             row[f"{attack_name}_Acc"] = f"{metrics['accuracy']:.2f}%"
             row[f"{attack_name}_ECE"] = f"{metrics['ece']:.4f}"
@@ -241,9 +251,9 @@ def generate_table(all_results):
 
 def main(args):
     """Main function to reproduce Table 3."""
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("REPRODUCING TABLE 3 FROM UAT PAPER")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Setup
     setup_seed(42)
@@ -260,23 +270,18 @@ def main(args):
 
     # Load data
     logger.info("Loading CIFAR-10...")
-    train_loader, val_loader = get_cifar10_loaders(
+    train_loader, val_loader, test_loader = get_cifar10_loaders(
         batch_size=128,
         num_workers=args.num_workers,
         augment=True,
     )
-    _, test_loader = get_cifar10_loaders(
-        batch_size=128,
-        num_workers=args.num_workers,
-        augment=False,
-    )
 
     # Define methods to train
     methods = [
-        ('vanilla', 'vanilla'),
-        ('pgd_at', 'pgd'),
-        ('uat_confsmooth', 'confsmooth'),
-        ('uat_ambiguity', 'class_ambiguity'),
+        ("vanilla", "vanilla"),
+        ("pgd_at", "pgd"),
+        ("uat_confsmooth", "confsmooth"),
+        ("uat_ambiguity", "class_ambiguity"),
     ]
 
     all_results = {}
@@ -311,9 +316,9 @@ def main(args):
         all_results[method_name] = results
 
     # Generate and print table
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("TABLE 3: DEFENSES VS ATTACKS COMPARISON")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     df = generate_table(all_results)
     logger.info(f"\n{df.to_string(index=False)}\n")
@@ -324,15 +329,15 @@ def main(args):
     logger.info(f"Results saved to: {csv_path}")
 
     # Print summary statistics
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("SUMMARY STATISTICS")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     for method_name, results in all_results.items():
-        clean_acc = results['Clean']['accuracy']
-        pgd_acc = results['PGD']['accuracy']
-        conf_acc = results['ConfSmooth']['accuracy']
-        amb_acc = results['ClassAmbiguity']['accuracy']
+        clean_acc = results["Clean"]["accuracy"]
+        pgd_acc = results["PGD"]["accuracy"]
+        conf_acc = results["ConfSmooth"]["accuracy"]
+        amb_acc = results["ClassAmbiguity"]["accuracy"]
 
         logger.info(f"\n{method_name}:")
         logger.info(f"  Clean Accuracy:         {clean_acc:.2f}%")
@@ -340,46 +345,33 @@ def main(args):
         logger.info(f"  ConfSmooth Rob. Acc:    {conf_acc:.2f}%")
         logger.info(f"  ClassAmbiguity Rob. Acc: {amb_acc:.2f}%")
 
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("Table 3 reproduction complete!")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Reproduce Table 3 from UAT paper")
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=200,
-        help="Number of training epochs (default: 200)"
+        "--epochs", type=int, default=200, help="Number of training epochs (default: 200)"
     )
     parser.add_argument(
-        "--device",
-        type=str,
-        default="cuda",
-        help="Device to use (cuda or cpu, default: cuda)"
+        "--device", type=str, default="cuda", help="Device to use (cuda or cpu, default: cuda)"
     )
     parser.add_argument(
-        "--num-workers",
-        type=int,
-        default=4,
-        help="Number of data loader workers (default: 4)"
+        "--num-workers", type=int, default=4, help="Number of data loader workers (default: 4)"
     )
     parser.add_argument(
         "--output-dir",
         type=str,
         default="checkpoints/paper_reproduction",
-        help="Output directory for checkpoints (default: checkpoints/paper_reproduction)"
+        help="Output directory for checkpoints (default: checkpoints/paper_reproduction)",
     )
-    parser.add_argument(
-        "--quick-test",
-        action="store_true",
-        help="Quick test mode: 1 epoch only"
-    )
+    parser.add_argument("--quick-test", action="store_true", help="Quick test mode: 1 epoch only")
     parser.add_argument(
         "--skip-training",
         action="store_true",
-        help="Skip training and only evaluate existing checkpoints"
+        help="Skip training and only evaluate existing checkpoints",
     )
 
     args = parser.parse_args()

@@ -8,6 +8,24 @@ Official implementation of **"Improving Vision Model Robustness against Misclass
 
 ---
 
+## ⚠️ Results need re-running
+
+A code audit found that the data pipeline applied `transforms.Normalize` while
+all three attacks clamped to `[0, 1]`. On real CIFAR-10 batches ~74% of pixel
+values fell outside `[0, 1]`, so the clamp — not the epsilon-ball — decided the
+attack output: the measured maximum perturbation was **2.43 against a nominal
+budget of 0.031 (8/255)**, about 78x over. Every robustness number produced
+before this fix was therefore not measured at the documented 8/255 L-infinity
+budget.
+
+The fix moves normalization inside the model (`src/models/resnet.py`), so
+attacks now operate on raw `[0, 1]` pixels and `epsilon=8/255` means what it
+says. A separate fix stops best-model selection from running against the test
+split. **Any numbers quoted below predate both fixes and need regenerating**;
+checkpoints trained before the fix should be discarded, not re-evaluated.
+
+---
+
 ## Overview
 
 This repository implements Underconfidence Adversarial Training (UAT), a novel defense against both misclassification and underconfidence attacks. UAT achieves comparable robustness to standard adversarial training with **50% fewer gradient steps** during attack generation.
@@ -57,7 +75,7 @@ python verify_install.py
 - Run `python verify_install.py` to confirm everything works
 - If imports fail, make sure you're in the correct directory and try: `pip uninstall underconfidence-adversarial-training && pip install -e .`
 
-### Option 2: Docker (Recommended)
+### Option 3: Docker
 
 ```bash
 # Build and run with Docker
@@ -149,6 +167,9 @@ python experiments/reproduce_table3.py --quick-test
 - PGD robust accuracy: 45-50%
 - ConfSmooth robust accuracy: 50-55%
 
+> These figures predate the epsilon-projection fix described at the top of this
+> README and have not yet been regenerated. Treat them as stale.
+
 ---
 
 ## Advanced Usage
@@ -196,6 +217,9 @@ python experiments/checkpoint_utils.py cleanup checkpoints/uat_confsmooth_cifar1
 ---
 
 ## Testing
+
+Testing needs the `dev` extra (`pip install -e ".[dev]"`), which brings in
+pytest, black and isort.
 
 ```bash
 # Run all tests

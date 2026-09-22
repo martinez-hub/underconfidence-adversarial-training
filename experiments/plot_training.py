@@ -27,7 +27,7 @@ def load_history_from_checkpoint(checkpoint_path: str) -> Dict[str, List[float]]
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
     if "history" not in checkpoint:
         raise KeyError(
@@ -68,7 +68,14 @@ def plot_training_curves(
     # Plot accuracy curves
     ax2.plot(epochs, history["train_acc_clean"], "b-", label="Train Acc (Clean)", linewidth=2)
     if "train_acc_train" in history:
-        ax2.plot(epochs, history["train_acc_train"], "g--", label="Train Acc (Train)", linewidth=2, alpha=0.7)
+        ax2.plot(
+            epochs,
+            history["train_acc_train"],
+            "g--",
+            label="Train Acc (Train)",
+            linewidth=2,
+            alpha=0.7,
+        )
     ax2.plot(epochs, history["val_acc"], "r-", label="Val Acc", linewidth=2)
     ax2.set_xlabel("Epoch", fontsize=12)
     ax2.set_ylabel("Accuracy (%)", fontsize=12)
@@ -147,17 +154,18 @@ def compare_training_runs(
     if len(checkpoint_paths) != len(labels):
         raise ValueError("Number of checkpoint paths must match number of labels")
 
-    # Load all histories
-    histories = []
-    for path in checkpoint_paths:
+    # Load all histories. Keep each history paired with its label: appending to
+    # a separate list would shift every later label onto the wrong curve when a
+    # checkpoint fails to load.
+    runs = []
+    for path, label in zip(checkpoint_paths, labels):
         try:
-            history = load_history_from_checkpoint(path)
-            histories.append(history)
+            runs.append((load_history_from_checkpoint(path), label))
         except Exception as e:
             print(f"Warning: Failed to load {path}: {e}")
             continue
 
-    if not histories:
+    if not runs:
         print("Error: No valid histories loaded")
         return
 
@@ -165,8 +173,8 @@ def compare_training_runs(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     # Plot validation accuracy comparison
-    colors = plt.cm.tab10(range(len(histories)))
-    for i, (history, label) in enumerate(zip(histories, labels)):
+    colors = plt.cm.tab10(range(len(runs)))
+    for i, (history, label) in enumerate(runs):
         epochs = range(1, len(history["val_acc"]) + 1)
         ax1.plot(epochs, history["val_acc"], color=colors[i], label=label, linewidth=2)
 
@@ -177,7 +185,7 @@ def compare_training_runs(
     ax1.grid(True, alpha=0.3)
 
     # Plot validation loss comparison
-    for i, (history, label) in enumerate(zip(histories, labels)):
+    for i, (history, label) in enumerate(runs):
         epochs = range(1, len(history["val_loss"]) + 1)
         ax2.plot(epochs, history["val_loss"], color=colors[i], label=label, linewidth=2)
 
@@ -208,9 +216,9 @@ def print_training_summary(history: Dict[str, List[float]]):
     Args:
         history: Training history dictionary
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TRAINING SUMMARY")
-    print("="*60)
+    print("=" * 60)
 
     num_epochs = len(history["train_loss"])
     print(f"Total Epochs: {num_epochs}")
@@ -233,7 +241,7 @@ def print_training_summary(history: Dict[str, List[float]]):
     best_loss_epoch = history["val_loss"].index(best_val_loss) + 1
     print(f"Lowest Validation Loss: {best_val_loss:.4f} (Epoch {best_loss_epoch})")
 
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 def main():

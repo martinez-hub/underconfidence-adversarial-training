@@ -12,7 +12,7 @@
 - **Python**: 3.9
 - **PyTorch**: 2.2.2
 - **Compute**: CPU (smoke test)
-- **Repository**: `/Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training`
+- **Repository**: the repository root
 
 ---
 
@@ -240,7 +240,7 @@ The Underconfidence Adversarial Training (UAT) implementation has been successfu
 
 ## Repository Status
 
-**Location**: `/Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training`
+**Location**: the repository root
 
 **Git Commits**: 5 total
 ```

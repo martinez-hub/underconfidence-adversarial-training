@@ -38,9 +38,9 @@ echo "   pip version: $pip_version"
 
 echo ""
 echo "[3/4] Installing package in editable mode..."
-pip install -e .
-
-if [ $? -ne 0 ]; then
+# Tested with `if !` rather than `$?`: `set -e` aborts the script before a
+# `$? -ne 0` check could ever run, so those diagnostics were dead code.
+if ! pip install -e .; then
     echo "❌ Installation failed"
     echo "   Try: pip install --upgrade pip setuptools wheel"
     echo "   Then run this script again"
@@ -49,9 +49,7 @@ fi
 
 echo ""
 echo "[4/4] Verifying installation..."
-python verify_install.py
-
-if [ $? -eq 0 ]; then
+if python verify_install.py; then
     echo ""
     echo "============================================================"
     echo "✅ Installation completed successfully!"

@@ -141,7 +141,7 @@ def test_resnet18_cifar10_device_compatibility():
     model = get_resnet18_cifar10()
 
     # CPU device
-    device_cpu = torch.device('cpu')
+    device_cpu = torch.device("cpu")
     model_cpu = model.to(device_cpu)
 
     x = torch.randn(4, 3, 32, 32).to(device_cpu)
@@ -180,8 +180,44 @@ def test_resnet18_cifar10_num_classes():
     """Test that output has correct number of classes."""
     model = get_resnet18_cifar10()
 
-    # Check final layer
-    assert model.fc.out_features == 10
+    # Check final layer (the classifier lives on the wrapped backbone, since
+    # get_resnet18_cifar10 returns a NormalizedModel)
+    assert model.backbone.fc.out_features == 10
+
+    # And num_classes is honoured rather than hardcoded
+    assert get_resnet18_cifar10(num_classes=100).backbone.fc.out_features == 100
+
+
+def test_resnet18_normalizes_inputs_internally():
+    """
+    The model must normalize [0, 1] inputs itself.
+
+    Attacks operate on raw pixels, so normalization has to live in the model.
+    If it moved back into the data pipeline, the epsilon-ball and the attacks'
+    clamp(x, 0, 1) would both stop meaning what they claim.
+    """
+    from src.models.resnet import CIFAR10_MEAN, CIFAR10_STD
+
+    model = get_resnet18_cifar10()
+    model.eval()
+
+    x = torch.rand(2, 3, 32, 32)
+    normalized = model.normalize(x)
+
+    mean = torch.tensor(CIFAR10_MEAN).view(1, -1, 1, 1)
+    std = torch.tensor(CIFAR10_STD).view(1, -1, 1, 1)
+    assert torch.allclose(normalized, (x - mean) / std, atol=1e-6)
+
+    # A constant-0.5 image must not come out as 0.5 - normalization shifted it.
+    assert not torch.allclose(
+        model.normalize(torch.full((1, 3, 32, 32), 0.5)), torch.full((1, 3, 32, 32), 0.5)
+    )
+
+
+def test_resnet18_rejects_invalid_num_classes():
+    """num_classes must be positive."""
+    with pytest.raises(ValueError, match="num_classes"):
+        get_resnet18_cifar10(num_classes=0)
 
 
 if __name__ == "__main__":

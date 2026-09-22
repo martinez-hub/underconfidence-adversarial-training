@@ -26,8 +26,8 @@ Thank you for your interest in contributing to this project! This guide will hel
 
 This project follows standard Python conventions:
 
-- **Formatting**: Use `black` with default settings (88 character line length)
-- **Import sorting**: Use `isort` with default settings
+- **Formatting**: Use `black` (configured in `pyproject.toml` for a 100 character line length); just run `make format`
+- **Import sorting**: Use `isort` (black profile, also configured in `pyproject.toml`)
 - **Docstrings**: Google-style docstrings for all public functions/classes
 - **Type hints**: Add type hints where appropriate
 

@@ -160,7 +160,7 @@ This document summarizes the complete implementation of Underconfidence Adversar
 ### Quick Start (Smoke Test)
 
 ```bash
-cd /Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training
+cd underconfidence-adversarial-training
 
 # Run 2-epoch smoke test
 python experiments/train.py --config experiments/configs/smoke_test.yaml
@@ -224,7 +224,7 @@ pytest tests/ -v
 
 1. **Install dependencies**:
    ```bash
-   cd /Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training
+   cd underconfidence-adversarial-training
    pip install -r requirements.txt
    ```
 
@@ -334,11 +334,19 @@ experiments/
     └── uat_ambiguity_cifar10.yaml
 ```
 
-### Tests (2 files)
+### Tests (10 files)
 ```
 tests/
-├── test_attacks.py (200+ lines)
-└── __init__.py
+├── __init__.py
+├── smoke_test_comprehensive.py
+├── test_attacks.py
+├── test_backtracking_optimization.py
+├── test_calibration.py
+├── test_compatibility.py
+├── test_data.py
+├── test_models.py
+├── test_trainer.py
+└── test_validation.py
 ```
 
 ### Documentation (5 files)
@@ -354,7 +362,7 @@ requirements.txt
 
 ## Repository Status
 
-- **Location**: `/Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training`
+- **Location**: the repository root
 - **Git initialized**: ✅ Yes
 - **Initial commits**: ✅ 2 commits
 - **Ready for GitHub**: ✅ Yes (just need to create remote and push)

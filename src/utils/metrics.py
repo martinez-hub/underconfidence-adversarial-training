@@ -23,9 +23,7 @@ def accuracy(logits: torch.Tensor, labels: torch.Tensor) -> float:
     return 100.0 * correct / total
 
 
-def confidence_stats(
-    probs: torch.Tensor, labels: torch.Tensor
-) -> Tuple[float, float]:
+def confidence_stats(probs: torch.Tensor, labels: torch.Tensor) -> Tuple[float, float]:
     """
     Compute confidence statistics on correct predictions.
 

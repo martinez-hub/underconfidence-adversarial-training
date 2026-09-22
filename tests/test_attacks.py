@@ -1,11 +1,12 @@
 """Unit tests for adversarial attacks."""
 
+import sys
+from pathlib import Path
+
 import pytest
 import torch
 import torch.nn.functional as F
 
-import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.attacks.class_ambiguity import ClassPairAmbiguityAttack
@@ -17,6 +18,7 @@ from src.models.resnet import get_resnet18_cifar10
 @pytest.fixture
 def model():
     """Create a test model."""
+    torch.manual_seed(0)
     model = get_resnet18_cifar10()
     model.eval()
     return model
@@ -24,8 +26,17 @@ def model():
 
 @pytest.fixture
 def batch():
-    """Create a test batch."""
-    x = torch.randn(4, 3, 32, 32)
+    """
+    Create a test batch of images in [0, 1].
+
+    torch.rand, not torch.randn: the attacks are documented to take raw pixels
+    in [0, 1] and clamp their output to that range. Feeding unbounded noise made
+    the clamp -- not the epsilon-ball -- decide the result, so the
+    epsilon-constraint tests failed for a reason that had nothing to do with the
+    projection they were meant to check. Seeded so the suite is deterministic.
+    """
+    torch.manual_seed(0)
+    x = torch.rand(4, 3, 32, 32)
     y = torch.randint(0, 10, (4,))
     return x, y
 
@@ -40,7 +51,7 @@ def test_pgd_attack_increases_loss(model, batch):
         clean_loss = F.cross_entropy(clean_logits, y).item()
 
     # Generate adversarial examples
-    pgd = PGDAttack(model, epsilon=8/255, alpha=2/255, num_steps=10)
+    pgd = PGDAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=10)
     x_adv = pgd.generate(x, y)
 
     # Adversarial loss
@@ -54,9 +65,9 @@ def test_pgd_attack_increases_loss(model, batch):
 def test_pgd_satisfies_epsilon_constraint(model, batch):
     """PGD perturbations should be within epsilon-ball."""
     x, y = batch
-    epsilon = 8/255
+    epsilon = 8 / 255
 
-    pgd = PGDAttack(model, epsilon=epsilon, alpha=2/255, num_steps=10)
+    pgd = PGDAttack(model, epsilon=epsilon, alpha=2 / 255, num_steps=10)
     x_adv = pgd.generate(x, y)
 
     delta = (x_adv - x).abs().max().item()
@@ -74,7 +85,7 @@ def test_confsmooth_reduces_confidence(model, batch):
         clean_conf = clean_probs.max(dim=1)[0].mean().item()
 
     # Generate ConfSmooth adversarial examples
-    confsmooth = ConfSmoothAttack(model, epsilon=8/255, alpha=2/255, num_steps=20)
+    confsmooth = ConfSmoothAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=20)
     x_adv = confsmooth.generate(x, y)
 
     # Adversarial confidence
@@ -89,9 +100,9 @@ def test_confsmooth_reduces_confidence(model, batch):
 def test_confsmooth_satisfies_epsilon_constraint(model, batch):
     """ConfSmooth perturbations should be within epsilon-ball."""
     x, y = batch
-    epsilon = 8/255
+    epsilon = 8 / 255
 
-    confsmooth = ConfSmoothAttack(model, epsilon=epsilon, alpha=2/255, num_steps=20)
+    confsmooth = ConfSmoothAttack(model, epsilon=epsilon, alpha=2 / 255, num_steps=20)
     x_adv = confsmooth.generate(x, y)
 
     delta = (x_adv - x).abs().max().item()
@@ -109,7 +120,9 @@ def test_class_ambiguity_reduces_margin(model, batch):
         clean_margin = (top2_logits[:, 0] - top2_logits[:, 1]).mean().item()
 
     # Generate ambiguity attack
-    ambiguity = ClassPairAmbiguityAttack(model, epsilon=8/255, alpha=2/255, num_steps=20, target_pair_mode="top2")
+    ambiguity = ClassPairAmbiguityAttack(
+        model, epsilon=8 / 255, alpha=2 / 255, num_steps=20, target_pair_mode="top2"
+    )
     x_adv = ambiguity.generate(x, y)
 
     # Adversarial margin
@@ -124,9 +137,9 @@ def test_class_ambiguity_reduces_margin(model, batch):
 def test_class_ambiguity_satisfies_epsilon_constraint(model, batch):
     """Class ambiguity perturbations should be within epsilon-ball."""
     x, y = batch
-    epsilon = 8/255
+    epsilon = 8 / 255
 
-    ambiguity = ClassPairAmbiguityAttack(model, epsilon=epsilon, alpha=2/255, num_steps=20)
+    ambiguity = ClassPairAmbiguityAttack(model, epsilon=epsilon, alpha=2 / 255, num_steps=20)
     x_adv = ambiguity.generate(x, y)
 
     delta = (x_adv - x).abs().max().item()
@@ -140,36 +153,39 @@ def test_underconfidence_attacks_maintain_correct_predictions(model, batch):
     This tests the backtracking mechanism constraint.
     """
     x, y = batch
+    epsilon = 8 / 255
 
     # Get clean predictions (target classes to maintain)
     with torch.no_grad():
         clean_logits = model(x)
         target_class = clean_logits.argmax(dim=1)
 
-    # Test Class-Pair Ambiguity Attack
-    ambiguity = ClassPairAmbiguityAttack(model, epsilon=8/255, alpha=2/255, num_steps=20)
-    x_adv_ambiguity = ambiguity.generate(x, y)
+    for name, attack in (
+        (
+            "Class-Pair Ambiguity",
+            ClassPairAmbiguityAttack(model, epsilon=epsilon, alpha=2 / 255, num_steps=20),
+        ),
+        ("ConfSmooth", ConfSmoothAttack(model, epsilon=epsilon, alpha=2 / 255, num_steps=20)),
+    ):
+        x_adv = attack.generate(x, y)
 
-    with torch.no_grad():
-        logits_ambiguity = model(x_adv_ambiguity)
-        pred_ambiguity = logits_ambiguity.argmax(dim=1)
-        assert pred_ambiguity.eq(target_class).all(), "Class-Pair Ambiguity Attack caused misclassification!"
+        # Prediction preserved - the actual claim under test.
+        with torch.no_grad():
+            pred_adv = model(x_adv).argmax(dim=1)
+        assert pred_adv.eq(target_class).all(), f"{name} Attack caused misclassification!"
 
-    # Test ConfSmooth Attack
-    confsmooth = ConfSmoothAttack(model, epsilon=8/255, alpha=2/255, num_steps=20)
-    x_adv_confsmooth = confsmooth.generate(x, y)
-
-    with torch.no_grad():
-        logits_confsmooth = model(x_adv_confsmooth)
-        pred_confsmooth = logits_confsmooth.argmax(dim=1)
-        assert pred_confsmooth.eq(target_class).all(), "ConfSmooth Attack caused misclassification!"
+        # ...but a generate() that simply returned x would also satisfy that.
+        # Assert the attack did real work, within its budget.
+        assert not torch.allclose(x_adv, x), f"{name} Attack was a no-op"
+        delta = (x_adv - x).abs().max().item()
+        assert delta <= epsilon + 1e-6, f"{name} exceeded epsilon: {delta} > {epsilon}"
 
 
 def test_attacks_return_correct_shape(model, batch):
     """All attacks should return tensors with the same shape as input."""
     x, y = batch
-    epsilon = 8/255
-    alpha = 2/255
+    epsilon = 8 / 255
+    alpha = 2 / 255
 
     pgd = PGDAttack(model, epsilon=epsilon, alpha=alpha, num_steps=10)
     confsmooth = ConfSmoothAttack(model, epsilon=epsilon, alpha=alpha, num_steps=10)
@@ -187,8 +203,8 @@ def test_attacks_return_correct_shape(model, batch):
 def test_attacks_produce_valid_images(model, batch):
     """All attacks should produce images in valid range [0, 1]."""
     x, y = batch
-    epsilon = 8/255
-    alpha = 2/255
+    epsilon = 8 / 255
+    alpha = 2 / 255
 
     pgd = PGDAttack(model, epsilon=epsilon, alpha=alpha, num_steps=10)
     confsmooth = ConfSmoothAttack(model, epsilon=epsilon, alpha=alpha, num_steps=10)
@@ -200,8 +216,58 @@ def test_attacks_produce_valid_images(model, batch):
 
     # Check valid range [0, 1]
     assert x_adv_pgd.min() >= 0.0 and x_adv_pgd.max() <= 1.0, "PGD produced invalid pixel values"
-    assert x_adv_confsmooth.min() >= 0.0 and x_adv_confsmooth.max() <= 1.0, "ConfSmooth produced invalid pixel values"
-    assert x_adv_ambiguity.min() >= 0.0 and x_adv_ambiguity.max() <= 1.0, "ClassAmbiguity produced invalid pixel values"
+    assert (
+        x_adv_confsmooth.min() >= 0.0 and x_adv_confsmooth.max() <= 1.0
+    ), "ConfSmooth produced invalid pixel values"
+    assert (
+        x_adv_ambiguity.min() >= 0.0 and x_adv_ambiguity.max() <= 1.0
+    ), "ClassAmbiguity produced invalid pixel values"
+
+
+@pytest.mark.parametrize("attack_cls", [PGDAttack, ConfSmoothAttack, ClassPairAmbiguityAttack])
+def test_attacks_respect_epsilon_on_pipeline_data(model, attack_cls):
+    """
+    Attacks must honour the epsilon-ball on data straight from the real loader.
+
+    This is the regression test for the domain bug: while the data pipeline
+    normalized images, every attack silently perturbed ~73% of pixels far beyond
+    epsilon (max 2.43 against a budget of 0.031), because clamp(x, 0, 1) rather
+    than the projection decided the output. No test exercised loader data, so
+    nothing caught it.
+    """
+    from src.data.cifar10 import get_cifar10_loaders
+
+    epsilon = 8 / 255
+    *_, test_loader = get_cifar10_loaders(batch_size=8, num_workers=0, augment=False)
+    x, y = next(iter(test_loader))
+
+    assert (
+        x.min() >= 0.0 and x.max() <= 1.0
+    ), f"loader must yield [0, 1] pixels, got [{x.min():.3f}, {x.max():.3f}]"
+
+    x_adv = attack_cls(model, epsilon=epsilon, alpha=2 / 255, num_steps=5).generate(x, y)
+
+    delta = (x_adv - x).abs().max().item()
+    assert (
+        delta <= epsilon + 1e-6
+    ), f"{attack_cls.__name__} perturbation {delta} exceeds epsilon {epsilon}"
+    assert x_adv.min() >= 0.0 and x_adv.max() <= 1.0
+
+
+def test_attacks_work_inside_no_grad(model, batch):
+    """
+    generate() must work even when the caller is inside torch.no_grad().
+
+    reproduce_table3.py evaluated every attack inside a no_grad block, which
+    made torch.autograd.grad raise and the Table-3 reproduction impossible.
+    """
+    x, y = batch
+
+    with torch.no_grad():
+        x_adv = PGDAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=3).generate(x, y)
+
+    assert x_adv.shape == x.shape
+    assert not torch.allclose(x_adv, x), "attack was a no-op under no_grad"
 
 
 if __name__ == "__main__":

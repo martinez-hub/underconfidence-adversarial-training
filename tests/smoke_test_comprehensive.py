@@ -9,9 +9,9 @@ import torch
 # Add src to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("COMPREHENSIVE SMOKE TEST")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 # Test 1: Import all modules
 print("Test 1: Importing all modules...")
@@ -30,6 +30,7 @@ try:
     )
     from src.utils.checkpoints import load_checkpoint, save_checkpoint
     from src.utils.config import load_config, setup_device, setup_seed, validate_config
+
     print("✅ All modules imported successfully\n")
 except Exception as e:
     print(f"❌ Import failed: {e}\n")
@@ -50,9 +51,9 @@ except Exception as e:
 # Test 3: Attack initialization
 print("Test 3: Initializing attacks...")
 try:
-    pgd = PGDAttack(model, epsilon=8/255, alpha=2/255, num_steps=5)
-    confsmooth = ConfSmoothAttack(model, epsilon=8/255, alpha=2/255, num_steps=3)
-    ambiguity = ClassPairAmbiguityAttack(model, epsilon=8/255, alpha=2/255, num_steps=5)
+    pgd = PGDAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=5)
+    confsmooth = ConfSmoothAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=3)
+    ambiguity = ClassPairAmbiguityAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=5)
     print("✅ All attacks initialized:")
     print("   - PGD Attack")
     print("   - ConfSmooth Attack")
@@ -108,8 +109,8 @@ try:
     probs = torch.softmax(logits_calib, dim=1)
     labels = torch.randint(0, 10, (20,))
 
-    # compute_ece returns (ece, bin_boundaries, bin_accuracies, bin_confidences)
-    ece, _, _, _ = compute_ece(probs, labels, n_bins=10)
+    # compute_ece returns (ece, bin_boundaries, bin_accuracies, bin_confidences, bin_counts)
+    ece, *_ = compute_ece(probs, labels, n_bins=10)
     mce = compute_mce(probs, labels, n_bins=10)
     brier = compute_brier_score(probs, labels)
 
@@ -165,17 +166,19 @@ try:
     from omegaconf import OmegaConf
 
     # Valid config
-    valid_cfg = OmegaConf.create({
-        'meta': {'seed': 42},
-        'optim': {'lr': 0.1, 'epochs': 10},
-        'attack': {'epsilon': 8/255, 'alpha': 2/255},
-        'training': {'attack_type': 'vanilla'},
-        'uat': {'target_class_boost': 0.01, 'pair_mode': 'top2'},
-    })
+    valid_cfg = OmegaConf.create(
+        {
+            "meta": {"seed": 42},
+            "optim": {"lr": 0.1, "epochs": 10},
+            "attack": {"epsilon": 8 / 255, "alpha": 2 / 255},
+            "training": {"attack_type": "vanilla"},
+            "uat": {"target_class_boost": 0.01, "pair_mode": "top2"},
+        }
+    )
     validate_config(valid_cfg)  # Should not raise
 
     # Invalid config
-    invalid_cfg = OmegaConf.create({'optim': {'lr': -0.1}})
+    invalid_cfg = OmegaConf.create({"optim": {"lr": -0.1}})
     try:
         validate_config(invalid_cfg)
         print("❌ Config validation failed: accepted invalid config\n")
@@ -194,7 +197,7 @@ except Exception as e:
 print("Test 8: Testing data loading...")
 try:
     # Use very small batch for speed
-    train_loader, val_loader = get_cifar10_loaders(batch_size=4, num_workers=0, augment=False)
+    train_loader, val_loader, _ = get_cifar10_loaders(batch_size=4, num_workers=0, augment=False)
 
     # Get one batch
     x_batch, y_batch = next(iter(train_loader))
@@ -218,29 +221,35 @@ try:
     from omegaconf import OmegaConf
 
     # Minimal config
-    cfg = OmegaConf.create({
-        'training': {'attack_type': 'vanilla'},
-        'attack': {'epsilon': 8/255, 'alpha': 2/255},
-        'uat': {'target_class_boost': 0.01, 'pair_mode': 'top2'},
-        'data': {'num_classes': 10},
-        'optim': {'epochs': 1, 'milestones': [], 'gamma': 0.1},
-        'logging': {'log_every': 1, 'save_every': 1, 'output_dir': '/tmp/smoke_test'},
-    })
+    cfg = OmegaConf.create(
+        {
+            "training": {"attack_type": "vanilla"},
+            "attack": {"epsilon": 8 / 255, "alpha": 2 / 255},
+            "uat": {"target_class_boost": 0.01, "pair_mode": "top2"},
+            "data": {"num_classes": 10},
+            "optim": {"epochs": 1, "milestones": [], "gamma": 0.1},
+            "logging": {"log_every": 1, "save_every": 1, "output_dir": "/tmp/smoke_test"},
+        }
+    )
 
     # Create tiny loaders (just 2 batches)
     from torchvision import datasets, transforms
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-    train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
-    val_dataset = datasets.CIFAR10(root='./data', train=False, transform=transform, download=True)
+
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+        ]
+    )
+    train_dataset = datasets.CIFAR10(root="./data", train=True, transform=transform, download=True)
+    val_dataset = datasets.CIFAR10(root="./data", train=False, transform=transform, download=True)
 
     # Use only 8 samples
     train_subset = torch.utils.data.Subset(train_dataset, range(8))
     val_subset = torch.utils.data.Subset(val_dataset, range(8))
 
-    tiny_train = torch.utils.data.DataLoader(train_subset, batch_size=4, shuffle=False, num_workers=0)
+    tiny_train = torch.utils.data.DataLoader(
+        train_subset, batch_size=4, shuffle=False, num_workers=0
+    )
     tiny_val = torch.utils.data.DataLoader(val_subset, batch_size=4, shuffle=False, num_workers=0)
 
     # Train for 1 epoch
@@ -254,28 +263,40 @@ try:
     val_metrics = trainer.validate(epoch=1)
 
     # Verify metrics
-    assert 'train_loss' in train_metrics, "Missing train_loss"
-    assert 'val_acc' in val_metrics, "Missing val_acc"
-    assert train_metrics['train_loss'] > 0, "Invalid train_loss"
-    assert 0 <= val_metrics['val_acc'] <= 100, "Invalid val_acc"
+    assert "train_loss" in train_metrics, "Missing train_loss"
+    assert "val_acc" in val_metrics, "Missing val_acc"
+    assert train_metrics["train_loss"] > 0, "Invalid train_loss"
+    assert 0 <= val_metrics["val_acc"] <= 100, "Invalid val_acc"
 
-    # Verify history tracking
-    assert len(trainer.history['train_loss']) == 0, "History should be empty (fit() not called)"
+    # train_epoch()/validate() do not append to history -- fit() does. Assert
+    # that, rather than printing "History tracking: OK" for an empty list.
+    assert (
+        len(trainer.history["train_loss"]) == 0
+    ), "train_epoch() must not append to history; fit() owns that"
+    assert set(trainer.history) == {
+        "train_loss",
+        "train_acc_clean",
+        "train_acc_train",
+        "val_loss",
+        "val_acc",
+        "learning_rate",
+    }, f"unexpected history keys: {sorted(trainer.history)}"
 
     print("✅ Training loop working correctly")
     print(f"   - Train loss: {train_metrics['train_loss']:.4f}")
     print(f"   - Val accuracy: {val_metrics['val_acc']:.2f}%")
-    print(f"   - History tracking: ✓\n")
+    print(f"   - History keys initialized, populated by fit(): ✓\n")
 except Exception as e:
     print(f"❌ Training loop failed: {e}\n")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
 # Final summary
-print("="*80)
+print("=" * 80)
 print("✅ ALL SMOKE TESTS PASSED")
-print("="*80)
+print("=" * 80)
 print("\nTest Summary:")
 print("  1. Module imports: ✅")
 print("  2. Model creation: ✅")
@@ -287,4 +308,4 @@ print("  7. Config validation: ✅")
 print("  8. Data loading: ✅")
 print("  9. Training loop: ✅")
 print("\n🎉 Project is fully functional and ready for use!")
-print("="*80 + "\n")
+print("=" * 80 + "\n")

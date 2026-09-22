@@ -4,17 +4,17 @@ Get up and running with UAT in 5 minutes!
 
 ## Prerequisites
 
-- Python 3.8+
-- PyTorch 2.0+ (with CUDA support recommended)
+- Python 3.11+
+- PyTorch 2.6+ (with CUDA support recommended)
 
 ## Installation
 
 ```bash
 # Navigate to project directory
-cd /Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training
+cd underconfidence-adversarial-training
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package (and the dev extra, for pytest)
+pip install -e ".[dev]"
 ```
 
 ## Run Your First Experiment (2 minutes)
@@ -221,7 +221,7 @@ Download manually from https://www.cs.toronto.edu/~kriz/cifar.html and place in 
 
 Ensure you're running from project root:
 ```bash
-cd /Users/josuemartinez/Documents/PersonalProjects/underconfidence-adversarial-training
+cd underconfidence-adversarial-training
 python experiments/train.py --config experiments/configs/smoke_test.yaml
 ```
 

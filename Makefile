@@ -1,4 +1,5 @@
-.PHONY: install test lint format clean help run-smoke run-vanilla run-pgd run-uat-confsmooth run-uat-ambiguity
+.PHONY: install test lint format clean help run-smoke run-vanilla run-pgd run-uat-confsmooth run-uat-ambiguity \
+	eval-vanilla eval-pgd eval-uat-confsmooth eval-uat-ambiguity
 
 help:
 	@echo "Available commands:"

@@ -24,57 +24,81 @@ if missing_dirs:
 else:
     print(f"✅ In project root directory")
 
-# Test 1: Import src modules
-print("\n[1/5] Testing src module imports...")
-try:
-    import src
-    print(f"   ✓ src package found at: {src.__file__ if hasattr(src, '__file__') else 'built-in'}")
+# Test 1: Import src modules from OUTSIDE the repo.
+# Running `import src` here would succeed from the source tree alone, because
+# Python puts the script's own directory on sys.path -- so it would pass even
+# with nothing installed. A subprocess with a different cwd tests the install.
+print("\n[1/5] Testing src module imports (from outside the repo)...")
+MODULES = [
+    "src",
+    "src.data.cifar10",
+    "src.models.resnet",
+    "src.training.trainer",
+    "src.attacks.pgd",
+    "src.utils.config",
+]
+import subprocess
+import tempfile
 
-    from src.data.cifar10 import get_cifar10_loaders
-    print(f"   ✓ src.data.cifar10 imported")
+with tempfile.TemporaryDirectory() as probe_dir:
+    probe = subprocess.run(
+        [sys.executable, "-c", "import " + ", ".join(MODULES)],
+        cwd=probe_dir,
+        capture_output=True,
+        text=True,
+    )
 
-    from src.models.resnet import get_resnet18_cifar10
-    print(f"   ✓ src.models.resnet imported")
-
-    from src.training.trainer import Trainer
-    print(f"   ✓ src.training.trainer imported")
-
-    from src.attacks.pgd import PGDAttack
-    print(f"   ✓ src.attacks.pgd imported")
-
-    from src.utils.config import load_config
-    print(f"   ✓ src.utils.config imported")
-
-    print("✅ All src modules imported successfully!")
-except ImportError as e:
-    print(f"❌ Import error: {e}")
+if probe.returncode != 0:
+    print(f"❌ Package is not importable outside the source tree")
+    print(f"   {probe.stderr.strip().splitlines()[-1] if probe.stderr.strip() else 'unknown error'}")
     print("\nDiagnostic information:")
-    print(f"   Python path: {sys.path[:3]}...")
     print(f"   Working directory: {os.getcwd()}")
-
-    # Try to find where src is
-    import importlib.util
-    spec = importlib.util.find_spec("src")
-    if spec is None:
-        print(f"   'src' package not found in Python path")
-        print("\n💡 Solution:")
-        print("   1. Make sure you ran: pip install -e .")
-        print("   2. Try reinstalling: pip uninstall underconfidence-adversarial-training && pip install -e .")
-        print("   3. Check if you're in a virtual environment")
-    else:
-        print(f"   'src' found at: {spec.origin}")
-        print(f"   But import failed with: {e}")
+    print("\n💡 Solution:")
+    print("   1. Make sure you ran: pip install -e .")
+    print("   2. Try reinstalling: pip uninstall underconfidence-adversarial-training && pip install -e .")
+    print("   3. Check if you're in a virtual environment")
     sys.exit(1)
+
+for module in MODULES:
+    print(f"   ✓ {module} imported")
+print("✅ All src modules imported successfully!")
+
+# Now import locally too, for the config check below.
+from src.utils.config import load_config
 
 # Test 2: Check PyTorch
 print("\n[2/5] Checking PyTorch installation...")
+MIN_PYTHON = (3, 11)
+MIN_TORCH = (2, 6)
+MIN_TORCHVISION = (0, 21)
+
+
+def _version_tuple(raw):
+    """Parse a leading numeric version (e.g. '2.6.0+cpu') into a tuple."""
+    head = raw.split("+")[0]
+    parts = []
+    for piece in head.split(".")[:2]:
+        digits = "".join(c for c in piece if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+if sys.version_info[:2] < MIN_PYTHON:
+    print(f"❌ Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ required, "
+          f"got {sys.version.split()[0]}")
+    sys.exit(1)
+
 try:
     import torch
-    print(f"✅ PyTorch {torch.__version__} installed")
-    print(f"   CUDA available: {torch.cuda.is_available()}")
 except ImportError:
     print("❌ PyTorch not found. Please install: pip install torch torchvision")
     sys.exit(1)
+
+if _version_tuple(torch.__version__) < MIN_TORCH:
+    print(f"❌ torch>={MIN_TORCH[0]}.{MIN_TORCH[1]} required, got {torch.__version__}")
+    sys.exit(1)
+print(f"✅ PyTorch {torch.__version__} installed")
+print(f"   CUDA available: {torch.cuda.is_available()}")
 
 # Test 3: Check other dependencies
 print("\n[3/5] Checking other dependencies...")
@@ -83,13 +107,18 @@ try:
     import numpy as np
     import omegaconf
     import tqdm
-    print(f"✅ All dependencies installed")
-    print(f"   torchvision: {torchvision.__version__}")
-    print(f"   numpy: {np.__version__}")
 except ImportError as e:
     print(f"❌ Missing dependency: {e}")
     print("\nPlease run: pip install -e .")
     sys.exit(1)
+
+if _version_tuple(torchvision.__version__) < MIN_TORCHVISION:
+    print(f"❌ torchvision>={MIN_TORCHVISION[0]}.{MIN_TORCHVISION[1]} required, "
+          f"got {torchvision.__version__}")
+    sys.exit(1)
+print(f"✅ All dependencies installed")
+print(f"   torchvision: {torchvision.__version__}")
+print(f"   numpy: {np.__version__}")
 
 # Test 4: Check data directory
 print("\n[4/5] Checking directory structure...")

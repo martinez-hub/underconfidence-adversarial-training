@@ -69,7 +69,7 @@ def miscalibrated_predictions():
 def test_ece_bounds(random_predictions):
     """Test that ECE is between 0 and 1."""
     probs, labels = random_predictions
-    ece, _, _, _ = compute_ece(probs, labels, n_bins=15)
+    ece, *_ = compute_ece(probs, labels, n_bins=15)
 
     assert 0.0 <= ece <= 1.0, f"ECE {ece} out of bounds [0, 1]"
 
@@ -95,7 +95,7 @@ def test_perfect_calibration(perfect_predictions):
     """Test that perfect predictions have low calibration error."""
     probs, labels = perfect_predictions
 
-    ece, _, _, _ = compute_ece(probs, labels, n_bins=15)
+    ece, *_ = compute_ece(probs, labels, n_bins=15)
     mce = compute_mce(probs, labels, n_bins=15)
     brier = compute_brier_score(probs, labels)
 
@@ -109,19 +109,20 @@ def test_miscalibration_detected(miscalibrated_predictions):
     """Test that miscalibrated predictions have high calibration error."""
     probs, labels = miscalibrated_predictions
 
-    ece, _, _, _ = compute_ece(probs, labels, n_bins=15)
+    ece, *_ = compute_ece(probs, labels, n_bins=15)
     mce = compute_mce(probs, labels, n_bins=15)
 
-    # Miscalibrated predictions should have higher ECE and MCE
-    # (exact values depend on random seed, but should be > 0.1)
-    assert ece > 0.01, f"ECE for miscalibrated predictions should be > 0.01, got {ece}"
-    assert mce > 0.01, f"MCE for miscalibrated predictions should be > 0.01, got {mce}"
+    # The fixture is 0.9-confidence with ~0.1 accuracy (random labels over 10
+    # classes), so the expected error is about 0.9 - 0.1 = 0.8. Asserting only
+    # "> 0.01" would pass for almost any wrong implementation.
+    assert 0.75 < ece < 0.85, f"expected ECE near 0.8 for this fixture, got {ece}"
+    assert 0.75 < mce < 0.85, f"expected MCE near 0.8 for this fixture, got {mce}"
 
 
 def test_ece_structure(random_predictions):
     """Test that ECE returns correct structure."""
     probs, labels = random_predictions
-    ece, bin_boundaries, bin_accuracies, bin_confidences = compute_ece(
+    ece, bin_boundaries, bin_accuracies, bin_confidences, bin_counts = compute_ece(
         probs, labels, n_bins=15
     )
 
@@ -130,6 +131,8 @@ def test_ece_structure(random_predictions):
     assert isinstance(bin_boundaries, np.ndarray)
     assert isinstance(bin_accuracies, np.ndarray)
     assert isinstance(bin_confidences, np.ndarray)
+    assert isinstance(bin_counts, np.ndarray)
+    assert bin_counts.sum() == len(labels), "every sample must land in exactly one bin"
 
     # Check shapes
     assert len(bin_boundaries) == 16  # n_bins + 1
@@ -143,12 +146,13 @@ def test_compute_all_metrics(random_predictions):
     metrics = compute_calibration_metrics(probs, labels, n_bins=15)
 
     expected_keys = {
-        'ece',
-        'mce',
-        'brier',
-        'bin_boundaries',
-        'bin_accuracies',
-        'bin_confidences',
+        "ece",
+        "mce",
+        "brier",
+        "bin_boundaries",
+        "bin_accuracies",
+        "bin_confidences",
+        "bin_counts",
     }
 
     assert set(metrics.keys()) == expected_keys
@@ -160,7 +164,7 @@ def test_different_bin_counts(random_predictions):
 
     # Test with different bin counts
     for n_bins in [5, 10, 15, 20]:
-        ece, bin_boundaries, _, _ = compute_ece(probs, labels, n_bins=n_bins)
+        ece, bin_boundaries, *_ = compute_ece(probs, labels, n_bins=n_bins)
 
         assert len(bin_boundaries) == n_bins + 1
         assert 0.0 <= ece <= 1.0
@@ -177,9 +181,69 @@ def test_small_batch(random_predictions):
     metrics = compute_calibration_metrics(small_probs, small_labels, n_bins=5)
 
     # Should not crash and should return valid values
-    assert 0.0 <= metrics['ece'] <= 1.0
-    assert 0.0 <= metrics['mce'] <= 1.0
-    assert 0.0 <= metrics['brier'] <= 2.0
+    assert 0.0 <= metrics["ece"] <= 1.0
+    assert 0.0 <= metrics["mce"] <= 1.0
+    assert 0.0 <= metrics["brier"] <= 2.0
+
+
+def test_ece_exact_value_on_hand_computed_input():
+    """
+    ECE must match a value computed by hand.
+
+    Four samples, two bins. Confidences 0.9/0.9 (one correct, one wrong) and
+    0.6/0.6 (both correct), with n_bins=2 so the split is at 0.5.
+      bin (0.5, 1.0]: all four samples, mean confidence 0.75, accuracy 0.75
+    ...which makes ECE exactly 0. Use n_bins=10 to separate them:
+      bin (0.5, 0.6]: conf 0.6, acc 1.0  -> |0.6 - 1.0| = 0.4, weight 0.5
+      bin (0.8, 0.9]: conf 0.9, acc 0.5  -> |0.9 - 0.5| = 0.4, weight 0.5
+      ECE = 0.4 * 0.5 + 0.4 * 0.5 = 0.4
+    """
+    probs = torch.tensor(
+        [
+            [0.9, 0.1],  # correct
+            [0.9, 0.1],  # wrong
+            [0.6, 0.4],  # correct
+            [0.6, 0.4],  # correct
+        ]
+    )
+    labels = torch.tensor([0, 1, 0, 0])
+
+    ece, _, _, _, bin_counts = compute_ece(probs, labels, n_bins=10)
+
+    assert ece == pytest.approx(0.4, abs=1e-6), f"expected ECE 0.4, got {ece}"
+    assert bin_counts.sum() == 4
+
+
+def test_empty_bins_are_nan_not_zero():
+    """
+    An empty bin must be NaN, not 0.0.
+
+    Encoding empty bins as 0.0 makes them indistinguishable from a populated bin
+    in which every prediction was wrong -- and the reliability diagram then
+    masked on `accuracy > 0`, hiding exactly the worst-calibrated bins.
+    """
+    # All confidence in the top bin; every other bin is empty.
+    probs = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    labels = torch.tensor([0, 0])
+
+    _, _, bin_accuracies, bin_confidences, bin_counts = compute_ece(probs, labels, n_bins=10)
+
+    empty = bin_counts == 0
+    assert empty.sum() == 9, "expected 9 empty bins"
+    assert np.isnan(bin_accuracies[empty]).all()
+    assert np.isnan(bin_confidences[empty]).all()
+
+    # ...and the one populated bin holds real values.
+    assert bin_accuracies[~empty][0] == pytest.approx(1.0)
+
+
+def test_compute_ece_rejects_invalid_bin_count():
+    """n_bins must be positive."""
+    probs = torch.tensor([[0.9, 0.1]])
+    labels = torch.tensor([0])
+
+    with pytest.raises(ValueError, match="n_bins"):
+        compute_ece(probs, labels, n_bins=0)
 
 
 if __name__ == "__main__":

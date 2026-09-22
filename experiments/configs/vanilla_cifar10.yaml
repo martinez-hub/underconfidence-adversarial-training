@@ -15,6 +15,12 @@ model:
 training:
   attack_type: "vanilla"  # No adversarial training
 
+# Unused during vanilla training, but eval.py attacks the trained model and
+# needs the same budget as the adversarially trained baselines.
+attack:
+  epsilon: 0.031  # 8/255 (standard for CIFAR-10)
+  alpha: 0.008    # 2/255
+
 optim:
   epochs: 200
   lr: 0.1

@@ -144,32 +144,30 @@ python experiments/verify_attacks.py --num-batches 10
 
 ## Conclusion
 
-**✅ ALL VERIFICATION CHECKS PASSED (8/8)**
+**✅ ALL VERIFICATION CHECKS PASSED (7/7)**
 
-**Initial verification (1 batch) confirms underconfidence attacks work as designed:**
+Reproduce with `python experiments/verify_attacks.py --num-batches 2`. The
+script runs seven checks; the numbers below are from an actual run against an
+**untrained** (randomly initialized) ResNet-18, which is why clean accuracy is
+near chance at 7.8%. The checks test attack *behaviour*, not model quality.
 
-✅ **ConfSmooth successfully**:
-- Reduces confidence (-39%)
-- Maintains accuracy (100%)
-- Increases entropy (+15%)
-- Reduces margin (-25%)
+| # | Check | Result |
+|---|-------|--------|
+| 1 | PGD increases loss | ✅ 3.0077 → 4.2186 |
+| 2 | ConfSmooth reduces confidence | ✅ 0.4227 → 0.2510 (−40.6%) |
+| 3 | ConfSmooth maintains predictions | ✅ 7.8% → 7.8% |
+| 4 | ConfSmooth increases entropy | ✅ 1.7515 → 2.0899 (+19.3%) |
+| 5 | ClassAmbiguity reduces confidence | ✅ 0.4227 → 0.3092 (−26.8%) |
+| 6 | ClassAmbiguity maintains predictions | ✅ 7.8% → 7.8% |
+| 7 | ClassAmbiguity reduces margin | ✅ 0.7116 → 0.0470 (−93.4%) |
 
-✅ **ClassAmbiguity successfully**:
-- Reduces confidence (-39%)
-- Maintains accuracy (100%)
-- Increases entropy (+15%)
-- Reduces margin (-25%)
+Note on "maintains predictions": the enforced invariant is that the model's
+*clean prediction* is preserved, so adversarial accuracy equals clean accuracy.
+It is not 100% in absolute terms — on a sample the model already gets wrong, the
+attack keeps that same wrong prediction.
 
-✅ **Backtracking mechanism works**:
-- No misclassifications introduced by underconfidence attacks
-- Both attacks maintain 100% accuracy (same as clean)
-- Attack respects accuracy constraint as designed
-
-✅ **Implementation correct**:
-- All attacks behave as described in paper
-- PGD baseline working (increases loss)
-- Underconfidence attacks working (reduce confidence, maintain accuracy)
-- Ready for full training experiments
+There is no "ConfSmooth reduces margin" check in the script; an earlier version
+of this document listed one and reported 8/8.
 
 ---
 

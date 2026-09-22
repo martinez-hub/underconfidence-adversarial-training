@@ -13,7 +13,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.data.cifar10 import get_cifar10_loaders
 from src.models.resnet import get_resnet18_cifar10
 from src.training.trainer import Trainer
-from src.utils.config import load_config, setup_device, setup_seed
+from src.utils.config import load_config, setup_device, setup_seed, validate_config
 from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -35,11 +35,14 @@ def main(config_path: str, overrides: str = ""):
         override_dict = OmegaConf.from_dotlist(overrides.split(","))
         cfg = OmegaConf.merge(cfg, override_dict)
 
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("Configuration:")
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info(f"\n{OmegaConf.to_yaml(cfg)}")
-    logger.info("="*60)
+    logger.info("=" * 60)
+
+    # Fail fast on an out-of-range config rather than part-way into training
+    validate_config(cfg)
 
     # Setup
     setup_seed(cfg.meta.seed)
@@ -48,16 +51,20 @@ def main(config_path: str, overrides: str = ""):
 
     # Data
     logger.info("Loading CIFAR-10 dataset...")
-    train_loader, val_loader = get_cifar10_loaders(
+    # val_loader is a held-out slice of the training set; the test split is not
+    # touched here, so best-model selection cannot leak into the final numbers.
+    train_loader, val_loader, _ = get_cifar10_loaders(
         batch_size=cfg.data.batch_size,
         num_workers=cfg.data.num_workers,
         augment=cfg.data.augment,
     )
-    logger.info(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
+    logger.info(
+        f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}"
+    )
 
     # Model
     logger.info("Initializing model...")
-    model = get_resnet18_cifar10()
+    model = get_resnet18_cifar10(num_classes=cfg.data.num_classes)
     model = model.to(device)
     logger.info(f"Model: ResNet-18 (CIFAR-10 variant)")
 
@@ -90,39 +97,26 @@ def main(config_path: str, overrides: str = ""):
     )
 
     # Train
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("Starting training...")
-    logger.info("="*60)
+    logger.info("=" * 60)
     trainer.fit()
 
-    # Save final checkpoint
-    final_checkpoint_path = f"{cfg.logging.output_dir}/{attack_type}_final.pt"
-    from src.utils.checkpoints import save_checkpoint
-    save_checkpoint(
-        model,
-        optimizer,
-        cfg.optim.epochs,
-        path=final_checkpoint_path,
-    )
-    logger.info(f"Saved final checkpoint: {final_checkpoint_path}")
-    logger.info("="*60)
+    # Trainer.fit() writes "<attack_type>_final.pt" (with history and config)
+    # and "<attack_type>_best_model.pt"; no extra save is needed here.
+    logger.info("=" * 60)
     logger.info("Training complete!")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train UAT models on CIFAR-10")
-    parser.add_argument(
-        "--config",
-        type=str,
-        required=True,
-        help="Path to config file"
-    )
+    parser.add_argument("--config", type=str, required=True, help="Path to config file")
     parser.add_argument(
         "--overrides",
         type=str,
         default="",
-        help="Comma-separated config overrides (e.g., 'optim.epochs=10,optim.lr=0.01')"
+        help="Comma-separated config overrides (e.g., 'optim.epochs=10,optim.lr=0.01')",
     )
     args = parser.parse_args()
 
