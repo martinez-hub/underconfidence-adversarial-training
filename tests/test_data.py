@@ -191,5 +191,17 @@ def test_cifar10_rejects_invalid_val_size():
         get_cifar10_loaders(batch_size=32, num_workers=0, val_size=CIFAR10_TRAIN_TOTAL)
 
 
+def test_cifar10_rejects_empty_val_split():
+    """
+    val_size=0 must be refused, not quietly produce an empty loader.
+
+    Trainer.validate() divides by len(val_loader) and by the accumulated
+    sample count, so an empty validation split kills training with
+    ZeroDivisionError after the first epoch.
+    """
+    with pytest.raises(ValueError, match="val_size"):
+        get_cifar10_loaders(batch_size=32, num_workers=0, val_size=0)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

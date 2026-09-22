@@ -284,6 +284,25 @@ def test_attacks_reject_out_of_domain_input(model, attack_cls):
     attack.generate(torch.ones(2, 3, 32, 32), y)
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_attacks_reject_non_finite_input(model, bad):
+    """
+    Non-finite pixels must be refused, NaN included.
+
+    NaN compares false against everything, so a pure range check silently
+    accepts it: min() and max() both return NaN, both bounds tests are false,
+    and the attack goes on to emit non-finite "adversarial" examples that
+    corrupt every metric computed from them.
+    """
+    attack = PGDAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=2)
+    x = torch.rand(2, 3, 32, 32)
+    x[0, 0, 0, 0] = bad
+    y = torch.randint(0, 10, (2,))
+
+    with pytest.raises(ValueError, match="finite"):
+        attack.generate(x, y)
+
+
 def test_attacks_work_inside_no_grad(model, batch):
     """
     generate() must work even when the caller is inside torch.no_grad().

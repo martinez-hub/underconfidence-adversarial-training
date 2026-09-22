@@ -70,10 +70,21 @@ def validate_input_domain(x: "torch.Tensor") -> None:
         x: Candidate input batch
 
     Raises:
-        ValueError: If any value lies outside [0, 1]
+        ValueError: If any value is non-finite or lies outside [0, 1]
     """
     if x.numel() == 0:
         return
+
+    # Check finiteness FIRST. NaN compares false against everything, so a range
+    # test alone silently accepts it: min()/max() both return NaN, both
+    # comparisons below are false, and the attack proceeds to produce
+    # non-finite "adversarial" examples that then corrupt every downstream
+    # metric. (Infinities are caught by the range test, but NaN is not.)
+    if not bool(torch.isfinite(x).all()):
+        raise ValueError(
+            "attack inputs must be finite; got NaN or infinity. This usually "
+            "means preprocessing or a checkpoint produced corrupt data."
+        )
 
     low = float(x.min())
     high = float(x.max())

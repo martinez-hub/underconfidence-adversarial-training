@@ -39,14 +39,14 @@ def get_cifar10_loaders(
         num_workers: Number of worker processes for data loading
         data_dir: Directory to store/load CIFAR-10 data
         augment: Whether to apply data augmentation to the training split
-        val_size: Number of training images held out for validation
+        val_size: Number of training images held out for validation (>= 1)
         split_seed: Seed for the deterministic train/validation split
 
     Returns:
         (train_loader, val_loader, test_loader) tuple
 
     Raises:
-        ValueError: If val_size does not leave a non-empty training split
+        ValueError: If val_size is 0, or does not leave a non-empty training split
     """
     # Training transforms
     if augment:
@@ -95,8 +95,17 @@ def get_cifar10_loaders(
         download=True,
     )
 
-    if not 0 <= val_size < len(train_dataset):
-        raise ValueError(f"val_size must be in [0, {len(train_dataset)}), got {val_size}")
+    # Lower bound is 1, not 0: Trainer.validate() divides by len(val_loader)
+    # and by the accumulated sample count, so an empty validation split makes
+    # training die with ZeroDivisionError after its first epoch. Training
+    # without validation is not a supported mode - best-model selection needs
+    # it - so reject it here rather than half-support it.
+    if not 1 <= val_size < len(train_dataset):
+        raise ValueError(
+            f"val_size must be in [1, {len(train_dataset)}), got {val_size}. "
+            f"Training requires a non-empty validation split for best-model "
+            f"selection."
+        )
 
     train_size = len(train_dataset) - val_size
     split_generator = torch.Generator().manual_seed(split_seed)
