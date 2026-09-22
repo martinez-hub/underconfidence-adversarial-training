@@ -19,9 +19,18 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
+      # pull-requests/issues must be `write`, not `read`: they are what let the
+      # action post its reply. With read-only, a successful @claude invocation
+      # runs and then silently produces no visible response. Upstream documents
+      # this block as contents/pull-requests/issues/id-token all `write`.
+      #
+      # contents stays `read` deliberately. Write here would let a
+      # comment-triggered workflow push commits; this repo only uses Claude to
+      # answer questions and review. Raise it to `write` if you want Claude to
+      # commit changes itself.
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
