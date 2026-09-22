@@ -1,0 +1,33 @@
+# See https://pre-commit.com. Install with `pre-commit install`.
+# Keep the black/isort hook revs in step with the pins in pyproject.toml's dev
+# extra - CI lints with the latter, so a skew lets local commits pass hooks
+# that CI then rejects.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # Checkpoints and the CIFAR-10 archive are gitignored, but a stray
+        # `git add -f` of a .pt file would otherwise sail through.
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        additional_dependencies: ["tomli"]

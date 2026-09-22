@@ -1,0 +1,233 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: every job here only reads the repo.
+permissions:
+  contents: read
+
+# Cancel a superseded run on the same ref instead of letting redundant
+# matrices pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # CPU-only wheels. The default index pulls the CUDA build of torch (~2.5GB),
+  # which dominates CI time for a suite that never touches a GPU.
+  TORCH_INDEX: https://download.pytorch.org/whl/cpu
+
+jobs:
+  # Detect whether the change touches code, so docs-only PRs skip the test
+  # matrix. `ci-ok` is the single required check, so skipped jobs never block.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'experiments/**'
+              - 'verify_install.py'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+              - '.github/workflows/**'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install formatters
+        # Formatters only - no torch needed, so this job stays fast and gives
+        # quick feedback while the test matrix is still running.
+        run: pip install "black>=24.0.0" "isort>=5.13.0" "codespell>=2.3"
+      - name: Black
+        run: black --check src/ experiments/ tests/
+      - name: isort
+        run: isort --check src/ experiments/ tests/
+      - name: Spell check
+        run: codespell
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # pyproject declares requires-python >=3.11 and classifies 3.11/3.12,
+          # so those legs block. Linux is the primary target.
+          - { os: ubuntu-latest, python-version: "3.11", experimental: false }
+          - { os: ubuntu-latest, python-version: "3.12", experimental: false }
+          # macOS: the author's dev platform, and the only leg exercising the
+          # arm64 torch wheels.
+          - { os: macos-latest, python-version: "3.12", experimental: false }
+          # 3.13 is not yet an advertised version: early warning, not a gate.
+          - { os: ubuntu-latest, python-version: "3.13", experimental: true }
+    continue-on-error: ${{ matrix.experimental }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # The suite calls CIFAR10(download=True); without a cache every leg
+      # re-downloads ~170MB from the same host.
+      - name: Cache CIFAR-10
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: cifar10-${{ runner.os }}-v1
+
+      - name: Install CPU torch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url "$TORCH_INDEX"
+      - name: Install package with dev extra
+        # torch is already satisfied above, so this does not re-resolve it.
+        run: pip install -e ".[dev]"
+      - name: Show resolved environment
+        run: pip list
+
+      # test_compatibility.py asserts the declared floors (Python 3.11+,
+      # torch 2.6+, torchvision 0.21+). Those assertions are the point: they
+      # fail on an environment the project does not support.
+      - name: Run tests
+        run: pytest tests/ -v -p no:cacheprovider
+
+  smoke:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    # The pytest suite and the standalone scripts cover different ground: the
+    # scripts exercise the real entry points (argparse, logging, the attack
+    # verification checks) that no unit test imports.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Cache CIFAR-10
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: cifar10-${{ runner.os }}-v1
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url "$TORCH_INDEX"
+          pip install -e ".[dev]"
+      - name: Comprehensive smoke test
+        run: python tests/smoke_test_comprehensive.py
+      - name: Attack verification
+        # Guards the epsilon-projection invariant end to end: this is the check
+        # that would have caught the normalize/clamp domain bug.
+        run: python experiments/verify_attacks.py --num-batches 2
+
+  clean-install:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    # Build the wheel and install it into a fresh environment, then run
+    # verify_install.py from OUTSIDE the source tree. An editable install from
+    # the repo root passes even when packaging is broken, because the source
+    # directory is importable on its own - which is exactly how a broken
+    # package layout stayed invisible before.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+      - name: Install the wheel into a clean venv and verify
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --upgrade pip
+          /tmp/clean/bin/pip install torch torchvision --index-url "$TORCH_INDEX"
+          /tmp/clean/bin/pip install dist/*.whl
+          # From the repo root: verify_install.py probes importability in a
+          # subprocess whose cwd is elsewhere, so this tests the install.
+          /tmp/clean/bin/python verify_install.py
+
+  min-versions:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    # Resolve the LOWEST declared dependency versions and run the suite, so the
+    # floors in pyproject.toml stay honest. The torch>=2.6.0 floor matters
+    # especially: torch 2.6 is where torch.load flipped to weights_only=True,
+    # which is what makes checkpoint loading version-sensitive.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cache CIFAR-10
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: cifar10-${{ runner.os }}-v1
+      - name: Install at lowest-direct resolution
+        # uv, not pip: pip has no lowest-version resolver.
+        run: |
+          uv pip install --system --resolution lowest-direct \
+            --extra-index-url "$TORCH_INDEX" -e ".[dev]"
+      - name: Show resolved environment
+        run: uv pip list --system
+      - name: Run tests
+        run: pytest tests/ -q -p no:cacheprovider
+
+  # Single required status check. Passes when no needed job failed or was
+  # cancelled - skipped jobs (e.g. the test matrix on a docs-only PR) are fine.
+  # Set branch protection to require ONLY this check.
+  ci-ok:
+    if: always()
+    needs: [changes, lint, test, smoke, clean-install, min-versions]
+    runs-on: ubuntu-latest
+    steps:
+      # Fail CLOSED: require every needed job to be success/skipped rather than
+      # enumerating the bad states. GitHub reports results beyond
+      # failure/cancelled (e.g. 'abandoned' when a job dies during setup), so
+      # checking only for known-bad states lets real failures through.
+      - name: Require every job to have succeeded or been skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          bad=$(printf '%s' "$NEEDS" | jq -r '
+            to_entries[]
+            | select(.value.result != "success" and .value.result != "skipped")
+            | "  \(.key): \(.value.result)"')
+          if [ -n "$bad" ]; then
+            echo "::error::A required job did not pass:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+          echo "All required jobs succeeded or were skipped."

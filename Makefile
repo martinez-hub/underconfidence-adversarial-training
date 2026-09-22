@@ -1,4 +1,5 @@
-.PHONY: install test lint format clean help run-smoke run-vanilla run-pgd run-uat-confsmooth run-uat-ambiguity \
+.PHONY: install test lint format spell check precommit clean help \
+	run-smoke run-vanilla run-pgd run-uat-confsmooth run-uat-ambiguity \
 	eval-vanilla eval-pgd eval-uat-confsmooth eval-uat-ambiguity
 
 help:
@@ -7,6 +8,9 @@ help:
 	@echo "  make test                 - Run tests"
 	@echo "  make lint                 - Check code formatting"
 	@echo "  make format               - Format code with black and isort"
+	@echo "  make spell                - Spell check with codespell"
+	@echo "  make check                - Everything CI gates on (lint + spell + test)"
+	@echo "  make precommit            - Install the pre-commit hooks"
 	@echo "  make clean                - Remove Python cache files"
 	@echo "  make run-smoke            - Run smoke test (2 epochs)"
 	@echo "  make run-vanilla          - Train vanilla model (200 epochs)"
@@ -15,7 +19,7 @@ help:
 	@echo "  make run-uat-ambiguity    - Train UAT-Ambiguity model (200 epochs)"
 
 install:
-	pip install -r requirements.txt
+	pip install -e ".[dev]"
 
 test:
 	pytest tests/ -v
@@ -23,6 +27,16 @@ test:
 lint:
 	black --check src/ experiments/ tests/
 	isort --check src/ experiments/ tests/
+
+spell:
+	codespell
+
+# The same gates CI runs, in the same order, so a green `make check` means a
+# green `lint`/`test` job.
+check: lint spell test
+
+precommit:
+	pre-commit install
 
 format:
 	black src/ experiments/ tests/
