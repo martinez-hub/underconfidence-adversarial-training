@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    # This repo's default branch is `master`. `main` is listed too so a future
+    # rename cannot silently stop post-merge CI from running - the failure mode
+    # is invisible, because nothing reports when a workflow simply never fires.
+    branches: [master, main]
   pull_request:
   workflow_dispatch:
 

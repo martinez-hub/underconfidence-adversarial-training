@@ -254,6 +254,36 @@ def test_attacks_respect_epsilon_on_pipeline_data(model, attack_cls):
     assert x_adv.min() >= 0.0 and x_adv.max() <= 1.0
 
 
+@pytest.mark.parametrize("attack_cls", [PGDAttack, ConfSmoothAttack, ClassPairAmbiguityAttack])
+def test_attacks_reject_out_of_domain_input(model, attack_cls):
+    """
+    generate() must refuse input outside [0, 1] rather than repair it.
+
+    Clamping such input would silently manufacture a perturbation far outside
+    epsilon -- a pixel of -1 becomes 0, i.e. a delta of 1.0 against a budget of
+    8/255 -- and the clamped image need not preserve the prediction computed
+    from the original tensor. Since epsilon and the clamp projection are both
+    expressed in pixel units, out-of-domain input has no correct handling
+    except refusal.
+    """
+    attack = attack_cls(model, epsilon=8 / 255, alpha=2 / 255, num_steps=2)
+    y = torch.randint(0, 10, (2,))
+
+    # Normalized-looking data: what the old data pipeline produced.
+    with pytest.raises(ValueError, match=r"raw pixels in \[0, 1\]"):
+        attack.generate(torch.randn(2, 3, 32, 32) * 2, y)
+
+    # Just below 0 and just above 1 must both be caught.
+    with pytest.raises(ValueError, match=r"raw pixels in \[0, 1\]"):
+        attack.generate(torch.full((2, 3, 32, 32), -0.01), y)
+    with pytest.raises(ValueError, match=r"raw pixels in \[0, 1\]"):
+        attack.generate(torch.full((2, 3, 32, 32), 1.01), y)
+
+    # The exact boundaries are valid and must NOT raise.
+    attack.generate(torch.zeros(2, 3, 32, 32), y)
+    attack.generate(torch.ones(2, 3, 32, 32), y)
+
+
 def test_attacks_work_inside_no_grad(model, batch):
     """
     generate() must work even when the caller is inside torch.no_grad().

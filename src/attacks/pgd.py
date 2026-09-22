@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ._validation import validate_attack_params
+from ._validation import validate_attack_params, validate_input_domain
 
 
 class PGDAttack:
@@ -65,7 +65,12 @@ class PGDAttack:
 
         Returns:
             x_adv: Adversarial images in [0, 1], within epsilon of x
+
+        Raises:
+            ValueError: If x is not in [0, 1]
         """
+        validate_input_domain(x)
+
         x_adv = x.clone().detach()
 
         # Random initialization within epsilon-ball

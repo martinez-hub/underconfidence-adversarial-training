@@ -66,7 +66,9 @@ except Exception as e:
 print("Test 4: Generating adversarial examples...")
 try:
     model.eval()
-    x = torch.randn(4, 3, 32, 32)
+    # torch.rand, not torch.randn: attacks take raw pixels in [0, 1], and the
+    # model normalizes its own input.
+    x = torch.rand(4, 3, 32, 32)
     y = torch.randint(0, 10, (4,))
 
     with torch.no_grad():
@@ -103,7 +105,7 @@ except Exception as e:
 print("Test 5: Computing calibration metrics...")
 try:
     # Use more samples for calibration metrics (need at least as many samples as bins)
-    x_calib = torch.randn(20, 3, 32, 32)
+    x_calib = torch.rand(20, 3, 32, 32)
     with torch.no_grad():
         logits_calib = model(x_calib)
     probs = torch.softmax(logits_calib, dim=1)

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ._validation import validate_attack_params
+from ._validation import validate_attack_params, validate_input_domain
 
 
 class ClassPairAmbiguityAttack:
@@ -104,7 +104,12 @@ class ClassPairAmbiguityAttack:
             x_adv: Adversarial images in [0, 1], within epsilon of x, with
                 reduced confidence and the clean prediction preserved.
             info: Only when return_info=True, the diagnostics dict above.
+
+        Raises:
+            ValueError: If x is not in [0, 1]
         """
+        validate_input_domain(x)
+
         # CRITICAL: Get prediction on clean image first (this is our target class to maintain)
         with torch.no_grad():
             clean_logits = self.model(x)
@@ -122,10 +127,11 @@ class ClassPairAmbiguityAttack:
             init_pred = init_logits.argmax(dim=1)
             invalid_init = ~init_pred.eq(target_class)
             if invalid_init.any():
-                # Revert invalid samples to clean images. Clamped so that the
-                # return value is in [0, 1] even if the caller passed
-                # out-of-domain input.
-                x_adv[invalid_init] = torch.clamp(x[invalid_init], 0, 1)
+                # Revert invalid samples to the clean images. No clamp here: the
+                # entry check already guarantees x is in [0, 1], and clamping an
+                # out-of-domain input would silently manufacture a perturbation
+                # far outside epsilon instead of reporting the bad input.
+                x_adv[invalid_init] = x[invalid_init]
 
         # Select class pairs (based on clean prediction, not true label).
         # clean_logits is reused so "top2" costs no extra forward pass.
