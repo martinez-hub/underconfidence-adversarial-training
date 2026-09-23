@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "underconfidence-adversarial-training"
 version = "1.0.0"
-description = "Official implementation of UAT: Improving Vision Model Robustness via Underconfidence Adversarial Training (NLDL 2026)"
+description = "Independent reimplementation of UAT (NLDL 2026), written from the paper; not the official code behind the published results"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
