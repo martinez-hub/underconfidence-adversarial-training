@@ -1,8 +1,11 @@
 """
-Reproduce Table 3 from the UAT paper.
+Build the Table 3 comparison from the UAT paper, using this reimplementation.
 
-This script trains all defense methods and evaluates them against multiple
-attacks to reproduce the defense comparison table from the paper.
+Trains all defense methods and evaluates them against multiple attacks to
+produce the same table layout the paper reports. Note this is an independent
+reimplementation written from the paper, not the official code behind the
+published numbers, so agreement with the paper is the thing being tested here
+rather than something to assume.
 
 Defense Methods (rows):
 1. Vanilla (clean training)
