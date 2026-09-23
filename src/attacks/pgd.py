@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ._validation import validate_attack_params, validate_input_domain
+
 
 class PGDAttack:
     """
@@ -12,6 +14,10 @@ class PGDAttack:
     Generates adversarial examples by iteratively perturbing inputs
     to maximize the cross-entropy loss while staying within epsilon-ball.
 
+    Inputs are expected in raw [0, 1] pixel space; the model is responsible for
+    any normalization (see ``src.models.resnet.NormalizedModel``). This is what
+    makes ``epsilon`` a genuine pixel-space L-infinity budget.
+
     Reference: Madry et al. (2018) - Towards Deep Learning Models Resistant to Adversarial Attacks
     https://arxiv.org/abs/1706.06083
     """
@@ -19,8 +25,8 @@ class PGDAttack:
     def __init__(
         self,
         model: nn.Module,
-        epsilon: float = 8/255,
-        alpha: float = 2/255,
+        epsilon: float = 8 / 255,
+        alpha: float = 2 / 255,
         num_steps: int = 20,
         random_start: bool = True,
     ):
@@ -29,7 +35,7 @@ class PGDAttack:
 
         Args:
             model: Target model to attack
-            epsilon: Maximum perturbation size (L-infinity norm)
+            epsilon: Maximum perturbation size (L-infinity norm, in [0, 1] pixel units)
             alpha: Step size for each iteration
             num_steps: Number of attack iterations
             random_start: Whether to start from random point in epsilon-ball
@@ -37,23 +43,7 @@ class PGDAttack:
         Raises:
             ValueError: If parameters are invalid
         """
-        if model is None:
-            raise ValueError("Model cannot be None")
-
-        if epsilon < 0:
-            raise ValueError(f"epsilon must be non-negative, got {epsilon}")
-
-        if epsilon > 1:
-            raise ValueError(f"epsilon should typically be <= 1, got {epsilon}")
-
-        if alpha <= 0:
-            raise ValueError(f"alpha must be positive, got {alpha}")
-
-        if alpha > epsilon:
-            raise ValueError(f"alpha ({alpha}) should typically be <= epsilon ({epsilon})")
-
-        if num_steps <= 0:
-            raise ValueError(f"num_steps must be positive, got {num_steps}")
+        validate_attack_params(model, epsilon, alpha, num_steps)
 
         self.model = model
         self.epsilon = epsilon
@@ -70,12 +60,17 @@ class PGDAttack:
         Generate adversarial examples.
 
         Args:
-            x: Clean images [batch_size, 3, 32, 32]
+            x: Clean images in [0, 1], shape [batch_size, 3, 32, 32]
             y: True labels [batch_size]
 
         Returns:
-            x_adv: Adversarial images [batch_size, 3, 32, 32]
+            x_adv: Adversarial images in [0, 1], within epsilon of x
+
+        Raises:
+            ValueError: If x is not in [0, 1]
         """
+        validate_input_domain(x)
+
         x_adv = x.clone().detach()
 
         # Random initialization within epsilon-ball
@@ -83,25 +78,27 @@ class PGDAttack:
             x_adv = x_adv + torch.empty_like(x_adv).uniform_(-self.epsilon, self.epsilon)
             x_adv = torch.clamp(x_adv, 0, 1)
 
-        # PGD attack loop
-        for step in range(self.num_steps):
-            # Create a leaf tensor for gradient computation
-            x_adv = x_adv.detach().clone()
-            x_adv.requires_grad = True
+        # PGD attack loop. Attacks build their own graph, so grad must be
+        # enabled even when the caller is inside torch.no_grad().
+        with torch.enable_grad():
+            for step in range(self.num_steps):
+                # Create a leaf tensor for gradient computation
+                x_adv = x_adv.detach().clone()
+                x_adv.requires_grad = True
 
-            # Forward pass
-            logits = self.model(x_adv)
-            loss = F.cross_entropy(logits, y)
+                # Forward pass
+                logits = self.model(x_adv)
+                loss = F.cross_entropy(logits, y)
 
-            # Backward pass to get gradient
-            grad = torch.autograd.grad(loss, x_adv)[0]
+                # Backward pass to get gradient
+                grad = torch.autograd.grad(loss, x_adv)[0]
 
-            # Take step in direction of gradient (maximize loss)
-            with torch.no_grad():
-                x_adv = x_adv + self.alpha * grad.sign()
+                # Take step in direction of gradient (maximize loss)
+                with torch.no_grad():
+                    x_adv = x_adv + self.alpha * grad.sign()
 
-                # Project back to epsilon-ball around x
-                delta = torch.clamp(x_adv - x, -self.epsilon, self.epsilon)
-                x_adv = torch.clamp(x + delta, 0, 1)
+                    # Project back to epsilon-ball around x
+                    delta = torch.clamp(x_adv - x, -self.epsilon, self.epsilon)
+                    x_adv = torch.clamp(x + delta, 0, 1)
 
         return x_adv.detach()

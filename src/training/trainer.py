@@ -48,9 +48,10 @@ class Trainer:
         Initialize trainer.
 
         Args:
-            model: PyTorch model to train
+            model: PyTorch model to train (expects [0, 1] inputs)
             train_loader: Training data loader
-            val_loader: Validation data loader
+            val_loader: Validation data loader. Must be a held-out split, NOT
+                the test set: best-model selection runs against it every epoch.
             optimizer: Optimizer
             device: Device to train on
             cfg: Configuration object
@@ -100,6 +101,7 @@ class Trainer:
                 alpha=cfg.attack.alpha,
                 num_steps=10,  # Class Ambiguity: 10 steps
                 target_pair_mode=cfg.uat.get("pair_mode", "top2"),
+                num_classes=cfg.data.num_classes,
             )
             logger.info("Initialized Class-Pair Ambiguity attack (10 steps)")
 
@@ -166,8 +168,13 @@ class Trainer:
             total_loss += loss.item()
 
             with torch.no_grad():
-                # Accuracy on clean images
-                logits_clean = self.model(x)
+                # Accuracy on clean images. In vanilla mode the training
+                # examples *are* the clean images, so reuse the logits rather
+                # than paying for a second forward pass on every batch.
+                if self.attack is None:
+                    logits_clean = logits_train
+                else:
+                    logits_clean = self.model(x)
                 pred_clean = logits_clean.argmax(dim=1)
                 correct_clean += pred_clean.eq(y).sum().item()
 
@@ -179,11 +186,13 @@ class Trainer:
 
             # Update progress bar
             if (batch_idx + 1) % 10 == 0:
-                pbar.set_postfix({
-                    "loss": f"{total_loss / (batch_idx + 1):.4f}",
-                    "clean": f"{100.0 * correct_clean / total:.1f}%",
-                    "train": f"{100.0 * correct_train / total:.1f}%",
-                })
+                pbar.set_postfix(
+                    {
+                        "loss": f"{total_loss / (batch_idx + 1):.4f}",
+                        "clean": f"{100.0 * correct_clean / total:.1f}%",
+                        "train": f"{100.0 * correct_train / total:.1f}%",
+                    }
+                )
 
         return {
             "train_loss": total_loss / len(self.train_loader),
@@ -226,7 +235,9 @@ class Trainer:
 
     def fit(self):
         """Full training loop."""
-        logger.info(f"Starting training: {self.cfg.optim.epochs} epochs, attack type: {self.attack_type}")
+        logger.info(
+            f"Starting training: {self.cfg.optim.epochs} epochs, attack type: {self.attack_type}"
+        )
 
         for epoch in range(1, self.cfg.optim.epochs + 1):
             # Training
@@ -236,7 +247,7 @@ class Trainer:
             val_metrics = self.validate(epoch)
 
             # Get current learning rate
-            current_lr = self.optimizer.param_groups[0]['lr']
+            current_lr = self.optimizer.param_groups[0]["lr"]
 
             # Update training history
             self.history["train_loss"].append(train_metrics["train_loss"])
@@ -275,11 +286,15 @@ class Trainer:
                     config=self.cfg,
                     best_val_acc=self.best_val_acc,
                 )
-                logger.info(f"🏆 New best model! Val Acc: {self.best_val_acc:.2f}% (saved to {best_model_path})")
+                logger.info(
+                    f"🏆 New best model! Val Acc: {self.best_val_acc:.2f}% (saved to {best_model_path})"
+                )
 
             # Periodic checkpoint saving (with training history)
             if epoch % self.cfg.logging.save_every == 0:
-                checkpoint_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_epoch{epoch}.pt"
+                checkpoint_path = (
+                    f"{self.cfg.logging.output_dir}/{self.attack_type}_epoch{epoch}.pt"
+                )
                 save_checkpoint(
                     self.model,
                     self.optimizer,
@@ -290,8 +305,10 @@ class Trainer:
                 )
                 logger.info(f"Saved checkpoint: {checkpoint_path}")
 
-        # Save final model
-        final_model_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_final_model.pt"
+        # Save final model. Named "_final.pt" to match the Makefile eval
+        # targets and QUICKSTART; this is the single final checkpoint, and it
+        # carries the training history and config.
+        final_model_path = f"{self.cfg.logging.output_dir}/{self.attack_type}_final.pt"
         save_checkpoint(
             self.model,
             self.optimizer,
@@ -302,4 +319,6 @@ class Trainer:
         )
         logger.info(f"Saved final model: {final_model_path}")
 
-        logger.info(f"Training complete! Best Val Acc: {self.best_val_acc:.2f}% (Epoch {self.best_epoch})")
+        logger.info(
+            f"Training complete! Best Val Acc: {self.best_val_acc:.2f}% (Epoch {self.best_epoch})"
+        )

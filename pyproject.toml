@@ -37,6 +37,11 @@ dev = [
     "pytest>=8.0.0",
     "black>=24.0.0",
     "isort>=5.13.0",
+    "codespell>=2.3",
+    "pre-commit>=3.7.0",
+    # CI runs the suite with `-n auto`: the attack tests dominate runtime and
+    # are independent, so a single-process run leaves runner cores idle.
+    "pytest-xdist>=3.0",
 ]
 
 [project.urls]
@@ -58,6 +63,13 @@ target-version = ['py311']
 [tool.isort]
 profile = "black"
 line_length = 100
+
+[tool.codespell]
+# Scope matches CI and `make spell`. Left unscoped, codespell reads the
+# CIFAR-10 archive and the checkpoint binaries under data/ and checkpoints/.
+# The tree is currently clean with no ignore-words-list; add words here only
+# when a real false positive appears (and say which one).
+skip = "./data,./checkpoints,./.git,./build,./dist,./.venv,*.pt,*.pth,*.tar.gz,*.html"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

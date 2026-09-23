@@ -48,7 +48,7 @@ def inspect_checkpoint(checkpoint_path: str) -> Dict:
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
     metadata = {
         "path": str(checkpoint_path),
@@ -86,17 +86,19 @@ def print_checkpoint_table(checkpoints: List[Path], verbose: bool = False):
         print("No checkpoints found.")
         return
 
-    print("\n" + "="*120)
+    print("\n" + "=" * 120)
     print(f"Found {len(checkpoints)} checkpoint(s)")
-    print("="*120)
+    print("=" * 120)
 
     # Header
     if verbose:
-        print(f"{'Filename':<40} {'Epoch':<8} {'Size (MB)':<10} {'Val Acc':<10} {'Best Acc':<10} {'History':<8} {'Config':<8}")
-        print("-"*120)
+        print(
+            f"{'Filename':<40} {'Epoch':<8} {'Size (MB)':<10} {'Val Acc':<10} {'Best Acc':<10} {'History':<8} {'Config':<8}"
+        )
+        print("-" * 120)
     else:
         print(f"{'Filename':<40} {'Epoch':<8} {'Size (MB)':<10} {'Val Acc':<10} {'Best Acc':<10}")
-        print("-"*120)
+        print("-" * 120)
 
     # Checkpoint rows
     for ckpt_path in checkpoints:
@@ -106,20 +108,30 @@ def print_checkpoint_table(checkpoints: List[Path], verbose: bool = False):
             filename = ckpt_path.name
             epoch = str(meta["epoch"])
             size = f"{meta['size_mb']:.1f}"
-            val_acc = f"{meta.get('final_val_acc', 'N/A'):.2f}%" if isinstance(meta.get('final_val_acc'), (int, float)) else "N/A"
-            best_acc = f"{meta.get('best_val_acc', 'N/A'):.2f}%" if isinstance(meta.get('best_val_acc'), (int, float)) else "N/A"
+            val_acc = (
+                f"{meta.get('final_val_acc', 'N/A'):.2f}%"
+                if isinstance(meta.get("final_val_acc"), (int, float))
+                else "N/A"
+            )
+            best_acc = (
+                f"{meta.get('best_val_acc', 'N/A'):.2f}%"
+                if isinstance(meta.get("best_val_acc"), (int, float))
+                else "N/A"
+            )
 
             if verbose:
                 has_hist = "✓" if meta["has_history"] else "✗"
                 has_conf = "✓" if meta["has_config"] else "✗"
-                print(f"{filename:<40} {epoch:<8} {size:<10} {val_acc:<10} {best_acc:<10} {has_hist:<8} {has_conf:<8}")
+                print(
+                    f"{filename:<40} {epoch:<8} {size:<10} {val_acc:<10} {best_acc:<10} {has_hist:<8} {has_conf:<8}"
+                )
             else:
                 print(f"{filename:<40} {epoch:<8} {size:<10} {val_acc:<10} {best_acc:<10}")
 
         except Exception as e:
             print(f"{ckpt_path.name:<40} ERROR: {e}")
 
-    print("="*120 + "\n")
+    print("=" * 120 + "\n")
 
 
 def find_best_checkpoint(directory: str, pattern: str = "*.pt") -> Optional[Path]:
@@ -163,9 +175,9 @@ def compare_checkpoints(checkpoint_paths: List[str]):
     Args:
         checkpoint_paths: List of checkpoint paths to compare
     """
-    print("\n" + "="*100)
+    print("\n" + "=" * 100)
     print("CHECKPOINT COMPARISON")
-    print("="*100)
+    print("=" * 100)
 
     metadata_list = []
     for path in checkpoint_paths:
@@ -184,7 +196,7 @@ def compare_checkpoints(checkpoint_paths: List[str]):
     print(f"\n{'Metric':<30}", end="")
     for i in range(len(metadata_list)):
         print(f"Checkpoint {i+1:<15}", end="")
-    print("\n" + "-"*100)
+    print("\n" + "-" * 100)
 
     # Filename
     print(f"{'Filename':<30}", end="")
@@ -233,7 +245,7 @@ def compare_checkpoints(checkpoint_paths: List[str]):
             print(f"{str(epoch):<20}", end="")
         print()
 
-    print("="*100 + "\n")
+    print("=" * 100 + "\n")
 
 
 def cleanup_old_checkpoints(
@@ -249,8 +261,8 @@ def cleanup_old_checkpoints(
     Args:
         directory: Directory containing checkpoints
         keep_n: Number of recent periodic checkpoints to keep
-        keep_best: Whether to keep best_model.pt
-        keep_final: Whether to keep final_model.pt
+        keep_best: Whether to keep *_best_model.pt checkpoints
+        keep_final: Whether to keep *_final.pt checkpoints
         dry_run: If True, only print what would be deleted
     """
     directory = Path(directory)
@@ -264,7 +276,7 @@ def cleanup_old_checkpoints(
     for ckpt in all_checkpoints:
         if "best_model" in ckpt.name:
             best.append(ckpt)
-        elif "final_model" in ckpt.name:
+        elif "final" in ckpt.name:
             final.append(ckpt)
         elif "epoch" in ckpt.name:
             periodic.append(ckpt)
@@ -279,17 +291,14 @@ def cleanup_old_checkpoints(
     if len(periodic) > keep_n:
         to_delete.extend(periodic[keep_n:])
 
-    # Delete old best models (keep only most recent)
-    if not keep_best and best:
+    # Best/final checkpoints are one per training run, not a time series: a
+    # directory holding several belongs to several attack types, so pruning all
+    # but one would delete real results. Only the keep flags decide here.
+    if not keep_best:
         to_delete.extend(best)
-    elif len(best) > 1:
-        to_delete.extend(best[1:])
 
-    # Delete old final models (keep only most recent)
-    if not keep_final and final:
+    if not keep_final:
         to_delete.extend(final)
-    elif len(final) > 1:
-        to_delete.extend(final[1:])
 
     # Print summary
     print(f"\n{'='*60}")
@@ -335,25 +344,41 @@ def main():
     # List command
     list_parser = subparsers.add_parser("list", help="List checkpoints in directory")
     list_parser.add_argument("directory", type=str, help="Directory containing checkpoints")
-    list_parser.add_argument("--pattern", type=str, default="*.pt", help="Glob pattern (default: *.pt)")
-    list_parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed information")
+    list_parser.add_argument(
+        "--pattern", type=str, default="*.pt", help="Glob pattern (default: *.pt)"
+    )
+    list_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show detailed information"
+    )
 
     # Best command
     best_parser = subparsers.add_parser("best", help="Find best checkpoint")
     best_parser.add_argument("directory", type=str, help="Directory containing checkpoints")
-    best_parser.add_argument("--pattern", type=str, default="*.pt", help="Glob pattern (default: *.pt)")
+    best_parser.add_argument(
+        "--pattern", type=str, default="*.pt", help="Glob pattern (default: *.pt)"
+    )
 
     # Compare command
     compare_parser = subparsers.add_parser("compare", help="Compare multiple checkpoints")
-    compare_parser.add_argument("checkpoints", type=str, nargs="+", help="Checkpoint paths to compare")
+    compare_parser.add_argument(
+        "checkpoints", type=str, nargs="+", help="Checkpoint paths to compare"
+    )
 
     # Cleanup command
     cleanup_parser = subparsers.add_parser("cleanup", help="Clean up old checkpoints")
     cleanup_parser.add_argument("directory", type=str, help="Directory containing checkpoints")
-    cleanup_parser.add_argument("--keep", type=int, default=5, help="Number of recent checkpoints to keep (default: 5)")
-    cleanup_parser.add_argument("--no-keep-best", action="store_true", help="Don't keep best_model.pt")
-    cleanup_parser.add_argument("--no-keep-final", action="store_true", help="Don't keep final_model.pt")
-    cleanup_parser.add_argument("--execute", action="store_true", help="Actually delete (default is dry run)")
+    cleanup_parser.add_argument(
+        "--keep", type=int, default=5, help="Number of recent checkpoints to keep (default: 5)"
+    )
+    cleanup_parser.add_argument(
+        "--no-keep-best", action="store_true", help="Don't keep best_model.pt"
+    )
+    cleanup_parser.add_argument(
+        "--no-keep-final", action="store_true", help="Don't keep final_model.pt"
+    )
+    cleanup_parser.add_argument(
+        "--execute", action="store_true", help="Actually delete (default is dry run)"
+    )
 
     args = parser.parse_args()
 

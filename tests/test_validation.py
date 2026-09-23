@@ -1,8 +1,8 @@
 """Tests for error handling and validation."""
 
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import pytest
 import torch
@@ -18,21 +18,23 @@ from src.models.resnet import get_resnet18_cifar10
 from src.utils.checkpoints import load_checkpoint, save_checkpoint
 from src.utils.config import load_config, setup_device, validate_config
 
-
 # ============================================================================
 # Config Validation Tests
 # ============================================================================
 
+
 def test_validate_config_valid():
     """Test that valid config passes validation."""
-    cfg = OmegaConf.create({
-        'meta': {'seed': 42},
-        'optim': {'lr': 0.1, 'epochs': 10, 'weight_decay': 5e-4, 'momentum': 0.9},
-        'attack': {'epsilon': 8/255, 'alpha': 2/255},
-        'data': {'batch_size': 128, 'num_workers': 4},
-        'training': {'attack_type': 'vanilla'},
-        'uat': {'target_class_boost': 0.01, 'pair_mode': 'top2'},
-    })
+    cfg = OmegaConf.create(
+        {
+            "meta": {"seed": 42},
+            "optim": {"lr": 0.1, "epochs": 10, "weight_decay": 5e-4, "momentum": 0.9},
+            "attack": {"epsilon": 8 / 255, "alpha": 2 / 255},
+            "data": {"batch_size": 128, "num_workers": 4},
+            "training": {"attack_type": "vanilla"},
+            "uat": {"target_class_boost": 0.01, "pair_mode": "top2"},
+        }
+    )
 
     # Should not raise
     validate_config(cfg)
@@ -40,7 +42,7 @@ def test_validate_config_valid():
 
 def test_validate_config_negative_seed():
     """Test that negative seed is rejected."""
-    cfg = OmegaConf.create({'meta': {'seed': -1}})
+    cfg = OmegaConf.create({"meta": {"seed": -1}})
 
     with pytest.raises(ValueError, match="seed must be a non-negative integer"):
         validate_config(cfg)
@@ -48,7 +50,7 @@ def test_validate_config_negative_seed():
 
 def test_validate_config_negative_lr():
     """Test that negative learning rate is rejected."""
-    cfg = OmegaConf.create({'optim': {'lr': -0.1}})
+    cfg = OmegaConf.create({"optim": {"lr": -0.1}})
 
     with pytest.raises(ValueError, match="lr must be positive"):
         validate_config(cfg)
@@ -56,7 +58,7 @@ def test_validate_config_negative_lr():
 
 def test_validate_config_negative_epochs():
     """Test that negative epochs is rejected."""
-    cfg = OmegaConf.create({'optim': {'epochs': -1}})
+    cfg = OmegaConf.create({"optim": {"epochs": -1}})
 
     with pytest.raises(ValueError, match="epochs must be positive"):
         validate_config(cfg)
@@ -64,7 +66,7 @@ def test_validate_config_negative_epochs():
 
 def test_validate_config_negative_epsilon():
     """Test that negative epsilon is rejected."""
-    cfg = OmegaConf.create({'attack': {'epsilon': -0.1}})
+    cfg = OmegaConf.create({"attack": {"epsilon": -0.1}})
 
     with pytest.raises(ValueError, match="epsilon must be non-negative"):
         validate_config(cfg)
@@ -72,7 +74,7 @@ def test_validate_config_negative_epsilon():
 
 def test_validate_config_large_epsilon():
     """Test that epsilon > 1 is rejected."""
-    cfg = OmegaConf.create({'attack': {'epsilon': 2.0}})
+    cfg = OmegaConf.create({"attack": {"epsilon": 2.0}})
 
     with pytest.raises(ValueError, match="epsilon should typically be"):
         validate_config(cfg)
@@ -80,7 +82,7 @@ def test_validate_config_large_epsilon():
 
 def test_validate_config_invalid_attack_type():
     """Test that invalid attack type is rejected."""
-    cfg = OmegaConf.create({'training': {'attack_type': 'invalid'}})
+    cfg = OmegaConf.create({"training": {"attack_type": "invalid"}})
 
     with pytest.raises(ValueError, match="attack_type must be one of"):
         validate_config(cfg)
@@ -88,7 +90,7 @@ def test_validate_config_invalid_attack_type():
 
 def test_validate_config_invalid_pair_mode():
     """Test that invalid pair mode is rejected."""
-    cfg = OmegaConf.create({'uat': {'pair_mode': 'invalid'}})
+    cfg = OmegaConf.create({"uat": {"pair_mode": "invalid"}})
 
     with pytest.raises(ValueError, match="pair_mode must be one of"):
         validate_config(cfg)
@@ -98,12 +100,13 @@ def test_validate_config_invalid_pair_mode():
 # Checkpoint Validation Tests
 # ============================================================================
 
+
 def test_save_checkpoint_negative_epoch():
     """Test that negative epoch is rejected."""
     model = get_resnet18_cifar10()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 
-    with tempfile.NamedTemporaryFile(suffix='.pt') as f:
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         with pytest.raises(ValueError, match="Epoch must be non-negative"):
             save_checkpoint(model, optimizer, epoch=-1, path=f.name)
 
@@ -113,7 +116,7 @@ def test_load_checkpoint_nonexistent_file():
     model = get_resnet18_cifar10()
 
     with pytest.raises(FileNotFoundError, match="Checkpoint not found"):
-        load_checkpoint('/nonexistent/path.pt', model)
+        load_checkpoint("/nonexistent/path.pt", model)
 
 
 def test_load_checkpoint_invalid_file():
@@ -121,7 +124,7 @@ def test_load_checkpoint_invalid_file():
     model = get_resnet18_cifar10()
 
     # Create a file with invalid content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.pt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".pt", delete=False) as f:
         f.write("not a valid checkpoint")
         temp_path = f.name
 
@@ -138,7 +141,7 @@ def test_save_load_checkpoint_roundtrip():
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        checkpoint_path = Path(tmpdir) / 'checkpoint.pt'
+        checkpoint_path = Path(tmpdir) / "checkpoint.pt"
 
         # Save checkpoint
         save_checkpoint(model, optimizer, epoch=5, path=str(checkpoint_path))
@@ -149,10 +152,82 @@ def test_save_load_checkpoint_roundtrip():
 
         assert epoch == 5
 
+        # Asserting only the epoch would pass with weight loading removed.
+        # Check every parameter actually transferred.
+        original = model.state_dict()
+        restored = model2.state_dict()
+        assert set(original) == set(restored)
+        for key, value in original.items():
+            assert torch.equal(value, restored[key]), f"weights not restored for {key}"
+
+
+def test_checkpoint_roundtrip_preserves_config_and_history():
+    """
+    A checkpoint carrying omegaconf/history metadata must reload.
+
+    torch 2.6 flipped torch.load's default to weights_only=True, which rejects
+    the DictConfig the trainer stores -- making every checkpoint it wrote
+    unloadable. This is the regression test for that.
+    """
+    from omegaconf import OmegaConf
+
+    model = get_resnet18_cifar10()
+    cfg = OmegaConf.create({"training": {"attack_type": "pgd"}, "optim": {"epochs": 2}})
+    history = {"val_acc": [10.0, 20.0], "train_loss": [2.3, 1.9]}
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        checkpoint_path = Path(tmpdir) / "with_metadata.pt"
+        save_checkpoint(
+            model,
+            None,
+            epoch=2,
+            path=str(checkpoint_path),
+            config=cfg,
+            history=history,
+            best_val_acc=20.0,
+        )
+
+        model2 = get_resnet18_cifar10()
+        assert load_checkpoint(str(checkpoint_path), model2) == 2
+
+        reloaded = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
+        assert reloaded["history"] == history
+        assert reloaded["config"].training.attack_type == "pgd"
+        assert reloaded["best_val_acc"] == 20.0
+
+
+def test_failed_save_does_not_destroy_existing_checkpoint():
+    """
+    A failing save must leave the previous checkpoint intact.
+
+    save_checkpoint used to write in place, so an error mid-write truncated the
+    file -- losing an already-saved best model.
+    """
+    model = get_resnet18_cifar10()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        checkpoint_path = Path(tmpdir) / "best.pt"
+        save_checkpoint(model, None, epoch=1, path=str(checkpoint_path))
+        good_bytes = checkpoint_path.read_bytes()
+
+        # An unpicklable payload makes torch.save fail part-way through.
+        with pytest.raises(IOError):
+            save_checkpoint(
+                model,
+                None,
+                epoch=2,
+                path=str(checkpoint_path),
+                bad=lambda: None,  # local lambdas cannot be pickled
+            )
+
+        assert checkpoint_path.read_bytes() == good_bytes, "previous checkpoint was damaged"
+        assert not list(Path(tmpdir).glob("*.tmp")), "temporary file left behind"
+
 
 # ============================================================================
 # PGD Attack Validation Tests
 # ============================================================================
+
 
 def test_pgd_attack_none_model():
     """Test that None model is rejected."""
@@ -205,13 +280,14 @@ def test_pgd_attack_valid_params():
     model = get_resnet18_cifar10()
 
     # Should not raise
-    attack = PGDAttack(model, epsilon=8/255, alpha=2/255, num_steps=20)
+    attack = PGDAttack(model, epsilon=8 / 255, alpha=2 / 255, num_steps=20)
     assert attack is not None
 
 
 # ============================================================================
 # ConfSmooth Attack Validation Tests
 # ============================================================================
+
 
 def test_confsmooth_attack_none_model():
     """Test that None model is rejected."""
@@ -260,8 +336,7 @@ def test_confsmooth_attack_valid_params():
 
     # Should not raise
     attack = ConfSmoothAttack(
-        model, epsilon=8/255, alpha=2/255, num_steps=20,
-        num_classes=10, target_class_boost=0.01
+        model, epsilon=8 / 255, alpha=2 / 255, num_steps=20, num_classes=10, target_class_boost=0.01
     )
     assert attack is not None
 
@@ -269,6 +344,7 @@ def test_confsmooth_attack_valid_params():
 # ============================================================================
 # ClassAmbiguity Attack Validation Tests
 # ============================================================================
+
 
 def test_class_ambiguity_attack_none_model():
     """Test that None model is rejected."""
@@ -289,7 +365,7 @@ def test_class_ambiguity_attack_invalid_pair_mode():
     model = get_resnet18_cifar10()
 
     with pytest.raises(ValueError, match="target_pair_mode must be one of"):
-        ClassPairAmbiguityAttack(model, target_pair_mode='invalid')
+        ClassPairAmbiguityAttack(model, target_pair_mode="invalid")
 
 
 def test_class_ambiguity_attack_valid_params():
@@ -298,8 +374,7 @@ def test_class_ambiguity_attack_valid_params():
 
     # Should not raise
     attack = ClassPairAmbiguityAttack(
-        model, epsilon=8/255, alpha=2/255, num_steps=20,
-        target_pair_mode='top2'
+        model, epsilon=8 / 255, alpha=2 / 255, num_steps=20, target_pair_mode="top2"
     )
     assert attack is not None
 
@@ -308,23 +383,24 @@ def test_class_ambiguity_attack_valid_params():
 # Device Setup Tests
 # ============================================================================
 
+
 def test_setup_device_auto():
     """Test auto device selection."""
-    device = setup_device('auto')
+    device = setup_device("auto")
     assert device is not None
-    assert device.type in ['cpu', 'cuda']
+    assert device.type in ["cpu", "cuda"]
 
 
 def test_setup_device_cpu():
     """Test CPU device selection."""
-    device = setup_device('cpu')
-    assert device.type == 'cpu'
+    device = setup_device("cpu")
+    assert device.type == "cpu"
 
 
 def test_setup_device_invalid():
     """Test invalid device specification."""
     with pytest.raises(ValueError, match="Invalid device specification"):
-        setup_device('invalid_device_name')
+        setup_device("invalid_device_name")
 
 
 if __name__ == "__main__":

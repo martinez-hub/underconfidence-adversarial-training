@@ -12,7 +12,7 @@ Reference:
 - Naeini et al. (2015) "Obtaining Well Calibrated Probabilities"
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -23,7 +23,7 @@ def compute_ece(
     probs: torch.Tensor,
     labels: torch.Tensor,
     n_bins: int = 15,
-) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute Expected Calibration Error (ECE).
 
@@ -38,9 +38,16 @@ def compute_ece(
     Returns:
         ece: Expected calibration error (scalar)
         bin_boundaries: Bin boundaries [n_bins + 1]
-        bin_accuracies: Accuracy in each bin [n_bins]
-        bin_confidences: Average confidence in each bin [n_bins]
+        bin_accuracies: Accuracy in each bin [n_bins]; NaN where the bin is empty
+        bin_confidences: Average confidence in each bin [n_bins]; NaN where empty
+        bin_counts: Number of samples in each bin [n_bins]
+
+    Raises:
+        ValueError: If n_bins is not positive
     """
+    if n_bins <= 0:
+        raise ValueError(f"n_bins must be positive, got {n_bins}")
+
     confidences, predictions = torch.max(probs, dim=1)
     accuracies = predictions.eq(labels)
 
@@ -56,11 +63,17 @@ def compute_ece(
     ece = 0.0
     bin_accuracies = []
     bin_confidences = []
+    bin_counts = []
 
-    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        # Find samples in this bin
-        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
+    for i, (bin_lower, bin_upper) in enumerate(zip(bin_lowers, bin_uppers)):
+        # Find samples in this bin. The first bin is closed on the left so a
+        # confidence of exactly 0 is not dropped.
+        if i == 0:
+            in_bin = (confidences >= bin_lower) & (confidences <= bin_upper)
+        else:
+            in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
         prop_in_bin = in_bin.mean()
+        bin_counts.append(int(in_bin.sum()))
 
         if prop_in_bin > 0:
             accuracy_in_bin = accuracies[in_bin].mean()
@@ -72,10 +85,18 @@ def compute_ece(
             bin_accuracies.append(accuracy_in_bin)
             bin_confidences.append(confidence_in_bin)
         else:
-            bin_accuracies.append(0.0)
-            bin_confidences.append(0.0)
+            # NaN, not 0.0: an empty bin must stay distinguishable from a bin
+            # where every prediction was wrong.
+            bin_accuracies.append(np.nan)
+            bin_confidences.append(np.nan)
 
-    return ece, bin_boundaries, np.array(bin_accuracies), np.array(bin_confidences)
+    return (
+        float(ece),
+        bin_boundaries,
+        np.array(bin_accuracies),
+        np.array(bin_confidences),
+        np.array(bin_counts),
+    )
 
 
 def compute_mce(
@@ -111,9 +132,13 @@ def compute_mce(
 
     mce = 0.0
 
-    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        # Find samples in this bin
-        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
+    for i, (bin_lower, bin_upper) in enumerate(zip(bin_lowers, bin_uppers)):
+        # Find samples in this bin. The first bin is closed on the left so a
+        # confidence of exactly 0 is not dropped.
+        if i == 0:
+            in_bin = (confidences >= bin_lower) & (confidences <= bin_upper)
+        else:
+            in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
 
         if in_bin.sum() > 0:
             accuracy_in_bin = accuracies[in_bin].mean()
@@ -122,7 +147,7 @@ def compute_mce(
             # MCE: maximum |accuracy - confidence|
             mce = max(mce, np.abs(accuracy_in_bin - confidence_in_bin))
 
-    return mce
+    return float(mce)
 
 
 def compute_brier_score(
@@ -173,22 +198,24 @@ def compute_calibration_metrics(
         - mce: Maximum calibration error
         - brier: Brier score
         - bin_boundaries: Bin boundaries for reliability diagram
-        - bin_accuracies: Accuracy in each bin
-        - bin_confidences: Average confidence in each bin
+        - bin_accuracies: Accuracy in each bin (NaN where the bin is empty)
+        - bin_confidences: Average confidence in each bin (NaN where empty)
+        - bin_counts: Number of samples in each bin
     """
-    ece, bin_boundaries, bin_accuracies, bin_confidences = compute_ece(
+    ece, bin_boundaries, bin_accuracies, bin_confidences, bin_counts = compute_ece(
         probs, labels, n_bins
     )
     mce = compute_mce(probs, labels, n_bins)
     brier = compute_brier_score(probs, labels)
 
     return {
-        'ece': ece,
-        'mce': mce,
-        'brier': brier,
-        'bin_boundaries': bin_boundaries,
-        'bin_accuracies': bin_accuracies,
-        'bin_confidences': bin_confidences,
+        "ece": ece,
+        "mce": mce,
+        "brier": brier,
+        "bin_boundaries": bin_boundaries,
+        "bin_accuracies": bin_accuracies,
+        "bin_confidences": bin_confidences,
+        "bin_counts": bin_counts,
     }
 
 
@@ -196,7 +223,8 @@ def plot_reliability_diagram(
     bin_boundaries: np.ndarray,
     bin_accuracies: np.ndarray,
     bin_confidences: np.ndarray,
-    save_path: str = None,
+    bin_counts: Optional[np.ndarray] = None,
+    save_path: Optional[str] = None,
 ):
     """
     Plot reliability diagram showing calibration quality.
@@ -206,8 +234,10 @@ def plot_reliability_diagram(
 
     Args:
         bin_boundaries: Bin boundaries [n_bins + 1]
-        bin_accuracies: Accuracy in each bin [n_bins]
-        bin_confidences: Average confidence in each bin [n_bins]
+        bin_accuracies: Accuracy in each bin [n_bins], NaN where the bin is empty
+        bin_confidences: Average confidence in each bin [n_bins], NaN where empty
+        bin_counts: Samples per bin [n_bins]. Drawn as the sample-distribution
+            histogram; omit it and that histogram is left out rather than faked.
         save_path: Optional path to save the plot
     """
     try:
@@ -219,39 +249,46 @@ def plot_reliability_diagram(
     fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot perfect calibration line
-    ax.plot([0, 1], [0, 1], '--', color='gray', label='Perfect calibration')
+    ax.plot([0, 1], [0, 1], "--", color="gray", label="Perfect calibration")
 
     # Plot actual calibration
     bin_centers = (bin_boundaries[:-1] + bin_boundaries[1:]) / 2
 
-    # Only plot non-empty bins
-    mask = bin_accuracies > 0
+    # Plot every populated bin. Masking on accuracy > 0 would silently hide the
+    # worst-calibrated bins, the ones where the model was confident and wrong.
+    if bin_counts is not None:
+        mask = np.asarray(bin_counts) > 0
+    else:
+        mask = ~np.isnan(bin_accuracies)
     ax.plot(
         bin_confidences[mask],
         bin_accuracies[mask],
-        'o-',
-        label='Model calibration',
+        "o-",
+        label="Model calibration",
         linewidth=2,
         markersize=8,
     )
 
-    # Add bar chart showing sample distribution
-    ax2 = ax.twinx()
-    ax2.bar(
-        bin_centers,
-        np.ones_like(bin_centers),  # Placeholder - would need sample counts
-        width=1.0/len(bin_centers),
-        alpha=0.3,
-        color='blue',
-        label='Sample distribution',
-    )
-    ax2.set_ylabel('Sample density', fontsize=12)
-    ax2.set_ylim(0, 1.5)
+    # Add bar chart showing the real sample distribution, when counts are given
+    if bin_counts is not None:
+        counts = np.asarray(bin_counts, dtype=float)
+        total = counts.sum()
+        ax2 = ax.twinx()
+        ax2.bar(
+            bin_centers,
+            counts / total if total > 0 else counts,
+            width=1.0 / len(bin_centers),
+            alpha=0.3,
+            color="blue",
+            label="Sample distribution",
+        )
+        ax2.set_ylabel("Fraction of samples", fontsize=12)
+        ax2.set_ylim(0, 1.0)
 
-    ax.set_xlabel('Confidence', fontsize=14)
-    ax.set_ylabel('Accuracy', fontsize=14)
-    ax.set_title('Reliability Diagram', fontsize=16)
-    ax.legend(loc='upper left', fontsize=12)
+    ax.set_xlabel("Confidence", fontsize=14)
+    ax.set_ylabel("Accuracy", fontsize=14)
+    ax.set_title("Reliability Diagram", fontsize=16)
+    ax.legend(loc="upper left", fontsize=12)
     ax.grid(alpha=0.3)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -259,7 +296,7 @@ def plot_reliability_diagram(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Saved reliability diagram to {save_path}")
     else:
         plt.show()
@@ -290,8 +327,9 @@ if __name__ == "__main__":
 
     # Plot reliability diagram
     plot_reliability_diagram(
-        metrics['bin_boundaries'],
-        metrics['bin_accuracies'],
-        metrics['bin_confidences'],
-        save_path='reliability_diagram.png',
+        metrics["bin_boundaries"],
+        metrics["bin_accuracies"],
+        metrics["bin_confidences"],
+        bin_counts=metrics["bin_counts"],
+        save_path="reliability_diagram.png",
     )
